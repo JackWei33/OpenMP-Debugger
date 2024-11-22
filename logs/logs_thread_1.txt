@@ -1,0 +1,40 @@
+--------------------------
+Time: 596
+Thread creation
+Thread type: ompt_thread_worker
+--------------------------
+--------------------------
+Time: 988
+On Mutex Acquire
+Kind: ompt_mutex_critical
+Wait id: 5687505856
+Code pointer return address: 0x1005af158
+--------------------------
+--------------------------
+Time: 1095
+Sync Region
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_begin
+Code pointer return address: 0x0
+--------------------------
+--------------------------
+Time: 1192
+Sync Region Wait
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_begin
+Code pointer return address: 0x0
+--------------------------
+--------------------------
+Time: 1744
+Sync Region Wait
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code pointer return address: 0x0
+--------------------------
+--------------------------
+Time: 1903
+Sync Region
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code pointer return address: 0x0
+--------------------------
