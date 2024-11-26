@@ -1,139 +1,113 @@
 --------------------------
-Time: 3
+Time: 853
 Thread creation
-Thread type: ompt_thread_initial
+Thread type: ompt_thread_worker
 --------------------------
 --------------------------
-Time: 532
+Time: 1816
 Implicit Task 
 Endpoint: ompt_scope_begin
-Task data: 0
-Actual parallelism: 1
-Index: 1
-Flags: 1
---------------------------
---------------------------
-Time: 692
-Parallel region begins
---------------------------
---------------------------
-Time: 1722
-Implicit Task 
-Endpoint: ompt_scope_begin
-Task data: 1
+Task data: 4
 Actual parallelism: 12
-Index: 0
+Index: 3
 Flags: 2
 --------------------------
 --------------------------
-Time: 2676
+Time: 2856
 Work Event
 Work type: ompt_work_loop_static
 Endpoint: ompt_scope_begin
 Parallel data: 0
-Task data: 1
+Task data: 4
 Count: 10
 Code pointer return address: 0x1005cf048
 --------------------------
 --------------------------
-Time: 2940
+Time: 3125
 On Mutex Acquire
 Kind: ompt_mutex_critical
 Wait id: 5442159296
 Code pointer return address: 0x1005cf0e0
 --------------------------
 --------------------------
-Time: 3054
+Time: 5865
 Mutex Acquired
 Kind: ompt_mutex_critical
 Wait id: 5442159296
 Code pointer return address: 0x1005cf0e0
 --------------------------
 --------------------------
-Time: 3178
+Time: 5990
 Mutex Released
 Kind: ompt_mutex_critical
 Wait id: 5442159296
-Code pointer return address: 0x1005cf100
+Code pointer return address: 0x0
 --------------------------
 --------------------------
-Time: 3339
+Time: 6101
 On Mutex Acquire
 Kind: ompt_mutex_critical
 Wait id: 5442159296
 Code pointer return address: 0x1005cf0e0
 --------------------------
 --------------------------
-Time: 6121
+Time: 6827
 Mutex Acquired
 Kind: ompt_mutex_critical
 Wait id: 5442159296
 Code pointer return address: 0x1005cf0e0
 --------------------------
 --------------------------
-Time: 6252
+Time: 6965
 Mutex Released
 Kind: ompt_mutex_critical
 Wait id: 5442159296
-Code pointer return address: 0x1005cf100
+Code pointer return address: 0x0
 --------------------------
 --------------------------
-Time: 6388
+Time: 7059
 Work Event
 Work type: ompt_work_loop_static
 Endpoint: ompt_scope_end
 Parallel data: 0
-Task data: 1
+Task data: 4
 Count: 0
 Code pointer return address: 0x1005cf150
 --------------------------
 --------------------------
-Time: 6980
+Time: 7297
 Sync Region
 Kind: ompt_sync_region_barrier_implicit_parallel
 Endpoint: ompt_scope_begin
-Code pointer return address: 0x1005cef8c
+Code pointer return address: 0x0
 --------------------------
 --------------------------
-Time: 7112
+Time: 7472
 Sync Region Wait
 Kind: ompt_sync_region_barrier_implicit_parallel
 Endpoint: ompt_scope_begin
-Code pointer return address: 0x1005cef8c
+Code pointer return address: 0x0
 --------------------------
 --------------------------
-Time: 7588
+Time: 9189
 Sync Region Wait
 Kind: ompt_sync_region_barrier_implicit_parallel
 Endpoint: ompt_scope_end
-Code pointer return address: 0x1005cef8c
+Code pointer return address: 0x0
 --------------------------
 --------------------------
-Time: 7684
+Time: 9285
 Sync Region
 Kind: ompt_sync_region_barrier_implicit_parallel
 Endpoint: ompt_scope_end
-Code pointer return address: 0x1005cef8c
+Code pointer return address: 0x0
 --------------------------
 --------------------------
-Time: 7770
+Time: 9374
 Implicit Task 
 Endpoint: ompt_scope_end
-Task data: 1
-Actual parallelism: 12
-Index: 0
-Flags: 2
---------------------------
---------------------------
-Time: 7896
-Parallel region ends
---------------------------
---------------------------
-Time: 8060
-Implicit Task 
-Endpoint: ompt_scope_end
-Task data: 0
+Task data: 4
 Actual parallelism: 0
-Index: 1
-Flags: 1
+Index: 3
+Flags: 2
 --------------------------

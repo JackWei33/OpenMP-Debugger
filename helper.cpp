@@ -78,3 +78,57 @@ std::string ompt_scope_endpoint_t_to_string(ompt_scope_endpoint_t scopeEndpoint)
             return "Unknown scope endpoint";
     }
 }
+
+std::string ompt_work_t_to_string(ompt_work_t workType) {
+    switch (workType) {
+        case ompt_work_loop:
+            return "ompt_work_loop";
+        case ompt_work_sections:
+            return "ompt_work_sections";
+        case ompt_work_single_executor:
+            return "ompt_work_single_executor";
+        case ompt_work_single_other:
+            return "ompt_work_single_other";
+        case ompt_work_workshare:
+            return "ompt_work_workshare";
+        case ompt_work_distribute:
+            return "ompt_work_distribute";
+        case ompt_work_taskloop:
+            return "ompt_work_taskloop";
+        case ompt_work_scope:
+            return "ompt_work_scope";
+        case ompt_work_loop_static:
+            return "ompt_work_loop_static";
+        case ompt_work_loop_dynamic:
+            return "ompt_work_loop_dynamic";
+        case ompt_work_loop_guided:
+            return "ompt_work_loop_guided";
+        case ompt_work_loop_other:
+            return "ompt_work_loop_other";
+        default:
+            return "Unknown work type";
+    }
+}
+
+std::string ompt_task_status_t_to_string(ompt_task_status_t taskStatus) {
+    switch (taskStatus) {
+        case ompt_task_complete:
+            return "ompt_task_complete";
+        case ompt_task_yield:
+            return "ompt_task_yield";
+        case ompt_task_cancel:
+            return "ompt_task_cancel";
+        case ompt_task_detach:
+            return "ompt_task_detach";
+        case ompt_task_early_fulfill:
+            return "ompt_task_early_fulfill";
+        case ompt_task_late_fulfill:
+            return "ompt_task_late_fulfill";
+        case ompt_task_switch:
+            return "ompt_task_switch";
+        case ompt_taskwait_complete:
+            return "ompt_taskwait_complete";
+        default:
+            return "Unknown task status";
+    }
+}

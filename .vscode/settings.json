@@ -68,6 +68,9 @@
         "print": "cpp",
         "queue": "cpp",
         "stack": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "forward_list": "cpp",
+        "execution": "cpp",
+        "iomanip": "cpp"
     }
 }
