@@ -24,6 +24,12 @@ void on_parallel_begin(ompt_data_t *task_data, const ompt_frame_t *task_frame,
 {
     long long end_time = get_time_microsecond();
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
+    ompt_get_unique_id_t ompt_get_unique_id = (ompt_get_unique_id_t)global_lookup("ompt_get_unique_id");
+
+    if (ompt_get_unique_id) {
+        uint64_t unique_id = ompt_get_unique_id();
+        parallel_data->value = unique_id;
+    }
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
@@ -36,6 +42,9 @@ void on_parallel_begin(ompt_data_t *task_data, const ompt_frame_t *task_frame,
     outFile << "--------------------------" << std::endl;
     outFile << "Time: " << time << std::endl;
     outFile << "Parallel region begins" << std::endl;
+    if (parallel_data != nullptr) {
+        outFile << "Parallel id: " << parallel_data->value << std::endl;
+    }
     outFile << "--------------------------" << std::endl;
 }
 
@@ -56,6 +65,9 @@ void on_parallel_end(ompt_data_t *parallel_data, ompt_data_t *task_data, const v
     outFile << "--------------------------" << std::endl;
     outFile << "Time: " << time << std::endl;
     outFile << "Parallel region ends" << std::endl;
+    if (parallel_data != nullptr) {
+        outFile << "Parallel id: " << parallel_data->value << std::endl;
+    }
     outFile << "--------------------------" << std::endl;
 }
 
@@ -91,6 +103,9 @@ void on_work(
     }
     outFile << "Count: " << count << std::endl;
     outFile << "Code pointer return address: " << codeptr_ra << std::endl;
+    if (parallel_data != nullptr) {
+        outFile << "Parallel id: " << parallel_data->value << std::endl;
+    }
     outFile << "--------------------------" << std::endl;
 }
 
@@ -195,6 +210,9 @@ void on_implicit_task(
     outFile << "Actual parallelism: " << actual_parallelism << std::endl;
     outFile << "Index: " << index << std::endl;
     outFile << "Flags: " << flags << std::endl;
+    if (parallel_data != nullptr) {
+        outFile << "Parallel id: " << parallel_data->value << std::endl;
+    }
     outFile << "--------------------------" << std::endl;
 }
 
@@ -242,6 +260,16 @@ void on_sync_region(ompt_sync_region_t kind,
     outFile << "Kind: " << ompt_sync_region_t_to_string(kind) << std::endl;
     outFile << "Endpoint: " << ompt_scope_endpoint_t_to_string(endpoint) << std::endl;
     outFile << "Code pointer return address: " << codeptr_ra << std::endl;
+    if (parallel_data != nullptr) {
+        outFile << "Parallel id: " << parallel_data->value << std::endl;
+        task_data->value = parallel_data->value;
+    } else {
+        if (task_data != nullptr) {
+            outFile << "Parallel id: " << task_data->value << std::endl;
+        } else {
+            outFile << "No parallel data" << std::endl;
+        }
+    }
     outFile << "--------------------------" << std::endl;
 }
 
@@ -351,6 +379,16 @@ void on_sync_region_wait(ompt_sync_region_t kind,
     outFile << "Kind: " << ompt_sync_region_t_to_string(kind) << std::endl;
     outFile << "Endpoint: " << ompt_scope_endpoint_t_to_string(endpoint) << std::endl;
     outFile << "Code pointer return address: " << codeptr_ra << std::endl;
+    if (parallel_data != nullptr) {
+        outFile << "Parallel id: " << parallel_data->value << std::endl;
+        task_data->value = parallel_data->value;
+    } else {
+        if (task_data != nullptr) {
+            outFile << "Parallel id: " << task_data->value << std::endl;
+        } else {
+            outFile << "No parallel data" << std::endl;
+        }
+    }
     outFile << "--------------------------" << std::endl;
 }
 
