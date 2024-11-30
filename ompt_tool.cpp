@@ -9,20 +9,37 @@ ompt_function_lookup_t global_lookup = NULL;
 long long start_time;
 int global_task_number = 0;
 
-long long get_time_microsecond()
-{
+long long get_time_microsecond() {
     auto now = std::chrono::system_clock::now();
     auto duration = now.time_since_epoch();
     auto micros = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
     return micros;
 }
 
+void wipe_log(uint64_t thread_id) {
+    std::ofstream outFile;
+    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
+    outFile.open(filename, std::ios::trunc);
+}
+
+void log_event(uint64_t thread_id, const std::string &event_type, const std::vector<std::pair<std::string, std::string>> &details) {
+    std::ofstream outFile;
+    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
+    outFile.open(filename, std::ios::app);
+
+    outFile << "Time: " << (get_time_microsecond() - start_time) << " µs" << std::endl;
+    outFile << "Event: " << event_type << std::endl;
+
+    for (const auto &detail : details) {
+        outFile << detail.first << ": " << detail.second << std::endl;
+    }
+
+    outFile << "--------------------------" << std::endl;
+}
 // Callback for parallel region start
 void on_parallel_begin(ompt_data_t *task_data, const ompt_frame_t *task_frame,
                        ompt_data_t *parallel_data, uint32_t requested_parallelism,
-                       int flags, const void *codeptr_ra)
-{
-    long long end_time = get_time_microsecond();
+                       int flags, const void *codeptr_ra) {
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
     ompt_get_unique_id_t ompt_get_unique_id = (ompt_get_unique_id_t)global_lookup("ompt_get_unique_id");
 
@@ -34,41 +51,24 @@ void on_parallel_begin(ompt_data_t *task_data, const ompt_frame_t *task_frame,
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Parallel region begins" << std::endl;
-    if (parallel_data != nullptr) {
-        outFile << "Parallel id: " << parallel_data->value << std::endl;
-    }
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Parallel Begin", {
+        {"Parallel ID", std::to_string(parallel_data ? parallel_data->value : 0)},
+        {"Requested Parallelism", std::to_string(requested_parallelism)},
+        {"Flags", std::to_string(flags)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 // Callback for parallel region end
-void on_parallel_end(ompt_data_t *parallel_data, ompt_data_t *task_data, const void *codeptr_ra)
-{
-    long long end_time = get_time_microsecond();
+void on_parallel_end(ompt_data_t *parallel_data, ompt_data_t *task_data, const void *codeptr_ra) {
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
-
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Parallel region ends" << std::endl;
-    if (parallel_data != nullptr) {
-        outFile << "Parallel id: " << parallel_data->value << std::endl;
-    }
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Parallel End", {
+        {"Parallel ID", std::to_string(parallel_data ? parallel_data->value : 0)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 void on_work(
@@ -79,48 +79,24 @@ void on_work(
     uint64_t count,
     const void *codeptr_ra)
 {
-    long long end_time = get_time_microsecond();
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Work Event" << std::endl;
-    outFile << "Work type: " << ompt_work_t_to_string(work_type) << std::endl;
-    outFile << "Endpoint: " << ompt_scope_endpoint_t_to_string(endpoint) << std::endl;
-    if (parallel_data != nullptr) {
-        outFile << "Parallel data: " << parallel_data->value << std::endl;
-    }
-    if (task_data != nullptr) {
-        outFile << "Task data: " << task_data->value << std::endl;
-    }
-    outFile << "Count: " << count << std::endl;
-    outFile << "Code pointer return address: " << codeptr_ra << std::endl;
-    if (parallel_data != nullptr) {
-        outFile << "Parallel id: " << parallel_data->value << std::endl;
-    }
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Work", {
+        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"},
+        {"Work Type", ompt_work_t_to_string(work_type)},
+        {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
+        {"Count", std::to_string(count)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 
-void on_task_create(
-    ompt_data_t *parent_task_data,
-    const ompt_frame_t *parent_task_frame,
-    ompt_data_t *new_task_data,
-    int flags,
-    int has_dependences,
-    const void *codeptr_ra)
-{
-    long long end_time = get_time_microsecond();
+void on_task_create(ompt_data_t *parent_task_data, const ompt_frame_t *parent_task_frame,
+                    ompt_data_t *new_task_data, int flags, int has_dependences, const void *codeptr_ra) {
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
-
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
@@ -130,110 +106,64 @@ void on_task_create(
 
     new_task_data->value = task_number;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Task Created" << std::endl;
-    outFile << "Task number: " << task_number << std::endl;
-    outFile << "Parent task number: " << parent_task_data->value << std::endl;
-    outFile << "Has dependences: " << has_dependences << std::endl;
-    outFile << "Flags: " << flags << std::endl;
-    outFile << "Code pointer return address: " << codeptr_ra << std::endl;
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Task Create", {
+        {"Task Number", std::to_string(task_number)},
+        {"Parent Task Number", std::to_string(parent_task_data->value)},
+        {"Flags", std::to_string(flags)},
+        {"Has Dependences", std::to_string(has_dependences)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
-void on_task_schedule(
-    ompt_data_t *prior_task_data,
-    ompt_task_status_t prior_task_status,
-    ompt_data_t *next_task_data)
-{
-    long long end_time = get_time_microsecond();
+void on_task_schedule(ompt_data_t *prior_task_data, ompt_task_status_t prior_task_status,
+                      ompt_data_t *next_task_data) {
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
-
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Task Schedule" << std::endl;
-    outFile << "Prior task data: " << prior_task_data->value << std::endl;
-    outFile << "Prior task status: " << ompt_task_status_t_to_string(prior_task_status) << std::endl;
-    if (next_task_data != nullptr) {
-        outFile << "Next task data: " << next_task_data->value << std::endl;
-    }
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Task Schedule", {
+        {"Prior Task Data", std::to_string(prior_task_data->value)},
+        {"Prior Task Status", ompt_task_status_t_to_string(prior_task_status)},
+        {"Next Task Data", next_task_data ? std::to_string(next_task_data->value) : "N/A"}
+    });
 }
 
 
-void on_implicit_task(
-    ompt_scope_endpoint_t endpoint,
-    ompt_data_t *parallel_data,
-    ompt_data_t *task_data,
-    unsigned int actual_parallelism,
-    unsigned int index,
-    int flags)
-{
-    long long end_time = get_time_microsecond();
+void on_implicit_task(ompt_scope_endpoint_t endpoint, ompt_data_t *parallel_data,
+                      ompt_data_t *task_data, unsigned int actual_parallelism,
+                      unsigned int index, int flags) {
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
-
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    if (endpoint == ompt_scope_begin)
-    {
+    if (endpoint == ompt_scope_begin) {
         int task_number = global_task_number;
         #pragma omp atomic
         global_task_number++;
         task_data->value = task_number;
     }
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Implicit Task " << std::endl;
-    outFile << "Endpoint: " << ompt_scope_endpoint_t_to_string(endpoint) << std::endl;
-    // outFile << "Parallel data: " << parallel_data->value << std::endl;
-    outFile << "Task data: " << task_data->value << std::endl;
-    outFile << "Actual parallelism: " << actual_parallelism << std::endl;
-    outFile << "Index: " << index << std::endl;
-    outFile << "Flags: " << flags << std::endl;
-    if (parallel_data != nullptr) {
-        outFile << "Parallel id: " << parallel_data->value << std::endl;
-    }
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Implicit Task", {
+        {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
+        {"Task Data", std::to_string(task_data->value)},
+        {"Actual Parallelism", std::to_string(actual_parallelism)},
+        {"Index", std::to_string(index)},
+        {"Flags", std::to_string(flags)},
+        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"}
+    });
 }
-
 
 // Callback for thread creation
 void on_thread_create(ompt_thread_t thread_type, ompt_data_t *thread_data)
 {
-    long long end_time = get_time_microsecond();
     int omp_thread_num = omp_get_thread_num();
     thread_data->value = (uint64_t)omp_get_thread_num();
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(omp_thread_num) + ".txt";
-    outFile.open(filename);
+    wipe_log(omp_thread_num);
 
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Thread creation" << std::endl;
-    outFile << "Thread type: " << ompt_thread_t_to_string(thread_type) << std::endl;
-    outFile << "--------------------------" << std::endl;
+    log_event(omp_thread_num, "Thread Create", {
+        {"Thread Type", ompt_thread_t_to_string(thread_type)}
+    });
 }
 
 // Callback for synchronization region begin and end
@@ -243,34 +173,17 @@ void on_sync_region(ompt_sync_region_t kind,
                     ompt_data_t *task_data,
                     const void *codeptr_ra)
 {
-    long long end_time = get_time_microsecond();
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Sync Region" << std::endl;
-    outFile << "Kind: " << ompt_sync_region_t_to_string(kind) << std::endl;
-    outFile << "Endpoint: " << ompt_scope_endpoint_t_to_string(endpoint) << std::endl;
-    outFile << "Code pointer return address: " << codeptr_ra << std::endl;
-    if (parallel_data != nullptr) {
-        outFile << "Parallel id: " << parallel_data->value << std::endl;
-        task_data->value = parallel_data->value;
-    } else {
-        if (task_data != nullptr) {
-            outFile << "Parallel id: " << task_data->value << std::endl;
-        } else {
-            outFile << "No parallel data" << std::endl;
-        }
-    }
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Sync Region", {
+        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"},
+        {"Kind", ompt_sync_region_t_to_string(kind)},
+        {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 // Mutex acquire callback
@@ -282,24 +195,16 @@ void on_mutex_acquire(
     const void *codeptr_ra  // Return address of the call site
 )
 {
-    long long end_time = get_time_microsecond();
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "On Mutex Acquire" << std::endl;
-    outFile << "Kind: " << ompt_mutex_t_to_string(kind) << std::endl;
-    outFile << "Wait id: " << wait_id << std::endl;
-    outFile << "Code pointer return address: " << codeptr_ra << std::endl;
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Mutex Acquire", {
+        {"Kind", ompt_mutex_t_to_string(kind)},
+        {"Wait id", std::to_string(wait_id)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 void on_mutex_acquired(
@@ -308,24 +213,16 @@ void on_mutex_acquired(
     const void *codeptr_ra  // Return address of the call site
 )
 {
-    long long end_time = get_time_microsecond();
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-    int time = (int)(end_time - start_time);
-
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Mutex Acquired" << std::endl;
-    outFile << "Kind: " << ompt_mutex_t_to_string(kind) << std::endl;
-    outFile << "Wait id: " << wait_id << std::endl;
-    outFile << "Code pointer return address: " << codeptr_ra << std::endl;
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Mutex Acquired", {
+        {"Kind", ompt_mutex_t_to_string(kind)},
+        {"Wait id", std::to_string(wait_id)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 void on_mutex_released(
@@ -334,25 +231,16 @@ void on_mutex_released(
     const void *codeptr_ra  // Return address of the call site
 )
 {
-    long long end_time = get_time_microsecond();
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Mutex Released" << std::endl;
-    outFile << "Kind: " << ompt_mutex_t_to_string(kind) << std::endl;
-    outFile << "Wait id: " << wait_id << std::endl;
-    outFile << "Code pointer return address: " << codeptr_ra << std::endl;
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Mutex Released", {
+        {"Kind", ompt_mutex_t_to_string(kind)},
+        {"Wait id", std::to_string(wait_id)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 // Callback for synchronization region wait begin and end
@@ -362,34 +250,17 @@ void on_sync_region_wait(ompt_sync_region_t kind,
                          ompt_data_t *task_data,
                          const void *codeptr_ra)
 {
-    long long end_time = get_time_microsecond();
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
-    int time = (int)(end_time - start_time);
-    outFile << "--------------------------" << std::endl;
-    outFile << "Time: " << time << std::endl;
-    outFile << "Sync Region Wait" << std::endl;
-    outFile << "Kind: " << ompt_sync_region_t_to_string(kind) << std::endl;
-    outFile << "Endpoint: " << ompt_scope_endpoint_t_to_string(endpoint) << std::endl;
-    outFile << "Code pointer return address: " << codeptr_ra << std::endl;
-    if (parallel_data != nullptr) {
-        outFile << "Parallel id: " << parallel_data->value << std::endl;
-        task_data->value = parallel_data->value;
-    } else {
-        if (task_data != nullptr) {
-            outFile << "Parallel id: " << task_data->value << std::endl;
-        } else {
-            outFile << "No parallel data" << std::endl;
-        }
-    }
-    outFile << "--------------------------" << std::endl;
+    log_event(thread_id, "Sync Region Wait", {
+        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"},
+        {"Kind", ompt_sync_region_t_to_string(kind)},
+        {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
+        {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
+    });
 }
 
 // OMPT initialization
