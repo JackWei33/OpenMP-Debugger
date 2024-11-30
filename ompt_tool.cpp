@@ -136,20 +136,16 @@ void on_implicit_task(ompt_scope_endpoint_t endpoint, ompt_data_t *parallel_data
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    if (endpoint == ompt_scope_begin) {
-        int task_number = global_task_number;
-        #pragma omp atomic
-        global_task_number++;
-        task_data->value = task_number;
+    if (parallel_data) {
+        task_data->value = parallel_data->value;
     }
 
     log_event(thread_id, "Implicit Task", {
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
-        {"Task Data", std::to_string(task_data->value)},
         {"Actual Parallelism", std::to_string(actual_parallelism)},
         {"Index", std::to_string(index)},
         {"Flags", std::to_string(flags)},
-        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"}
+        {"Parallel ID", task_data ? std::to_string(task_data->value) : "N/A"}
     });
 }
 
@@ -178,8 +174,12 @@ void on_sync_region(ompt_sync_region_t kind,
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
+    if (parallel_data) {
+        task_data->value = parallel_data->value;
+    }
+
     log_event(thread_id, "Sync Region", {
-        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"},
+        {"Parallel ID", task_data ? std::to_string(task_data->value) : "N/A"},
         {"Kind", ompt_sync_region_t_to_string(kind)},
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
         {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
@@ -255,8 +255,12 @@ void on_sync_region_wait(ompt_sync_region_t kind,
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
+    if (parallel_data) {
+        task_data->value = parallel_data->value;
+    }
+
     log_event(thread_id, "Sync Region Wait", {
-        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"},
+        {"Parallel ID", task_data ? std::to_string(task_data->value) : "N/A"},
         {"Kind", ompt_sync_region_t_to_string(kind)},
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
         {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}

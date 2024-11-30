@@ -22,7 +22,7 @@ int main()
     long long start_time = get_time_microsecond();
     int sum = 0;
 
-    omp_set_num_threads(5);
+    omp_set_num_threads(2);
 
     // // Sleep for 1 second
     // std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -46,11 +46,11 @@ int main()
     //     sum++;
     // }
 
-    #pragma omp parallel for schedule(static, 1)
-    for (int i = 0; i < 5; i++) {
-        #pragma omp critical
-        sum++;
-    }
+    // #pragma omp parallel for schedule(static, 2)
+    // for (int i = 0; i < 10; i++) {
+    //     #pragma omp critical
+    //     sum++;
+    // }
     
     #pragma omp parallel for schedule(static, 1)
     for (int i = 0; i < 5; i++) {
