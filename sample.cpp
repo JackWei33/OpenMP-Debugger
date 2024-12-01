@@ -46,17 +46,48 @@ int main()
     //     sum++;
     // }
 
-    // #pragma omp parallel for schedule(static, 2)
-    // for (int i = 0; i < 10; i++) {
+    // #pragma omp parallel for schedule(static, 1)
+    // for (int i = 0; i < 5; i++) {
     //     #pragma omp critical
     //     sum++;
     // }
-    
-    #pragma omp parallel for schedule(static, 1)
-    for (int i = 0; i < 5; i++) {
-        #pragma omp critical
-        sum*=2;
+
+
+    #pragma omp parallel
+    {
+        #pragma omp single
+        sum++;
+
+        #pragma omp barrier
+
+        #pragma omp single 
+        sum++;
+
+        #pragma omp barrier
+
+        #pragma omp single 
+        {
+            sum++;
+        }
     }
+
+    // #pragma omp single ...
+    
+    // #pragma omp parallel num_threads(2)
+    // {
+    //     if (pid == 1) {
+    //         #pragma omp task 
+    //         {
+    //             // get_parallel_data... to link task to 
+    //         }
+    //     }
+    //     #pragma omp parallel for schedule(static, 1)
+    //     for (int i = 0; i < 2; i++) {
+    //         #pragma omp critical
+    //         sum*=2;
+    //     }
+    // }
+
     // // Parallel region using OpenMP
     // #pragma omp parallel num_threads(5)
     // {
