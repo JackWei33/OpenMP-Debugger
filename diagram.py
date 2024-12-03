@@ -393,11 +393,97 @@ def create_graph_for_dependency_viz(thread_num_to_events: dict):
         assert len(set(num_barrier_nodes)) == 1, "All threads must have the same number of barrier nodes"
         
         # barrier logic
-        
-                    
+          
         parallel_id_to_graph_nodes[parallel_id] = graph_nodes
     
     return parallel_id_to_graph_nodes
+
+def get_time_spent_by_section(thread_num_to_events: dict):
+    """ 
+    Calculates the time spent by each thread in different sections within each parallel section.
+
+    Returns a dictionary in the following format:
+    {
+        'Parallel Section 1': {
+            'Thread 0': {'Working': 5, 'Critical': 3, 'Mutex': 2},
+            'Thread 1': {'Working': 4, 'Critical': 6, 'Mutex': 1},
+            ...
+        },
+        'Parallel Section 2': {
+            ...
+        },
+        ...
+    }
+    """
+    sections = {}
+
+    # First, identify all parallel IDs from the events
+    parallel_ids = set()
+    for _, events in thread_num_to_events.items():
+        for event in events:
+            if isinstance(event, ParallelEvent):
+                parallel_ids.add(event.parallel_id)
+
+    # For each parallel ID, determine the boundary events per thread
+    for i, parallel_id in enumerate(parallel_ids):
+        section_name = f"Parallel Section {i}"
+        sections[section_name] = {}
+
+        for thread_number, events in thread_num_to_events.items():
+            # Initialize the time categories for the thread
+            sections[section_name][f"Thread {thread_number}"] = {
+                'Working': 0,
+                'Critical': 0,
+                'Mutex': 0
+            }
+
+            # Identify boundary events (first and last) for this parallel_id in the current thread
+            first_event = None
+            last_event = None
+            stack = []
+
+            for event in events:
+                if extract_parallel_id(event) == parallel_id and first_event is None:
+                    first_event = event
+                    stack.append(event)
+                elif first_event is not None:
+                    if isinstance(event, ImplicitTaskEvent):
+                        if event.endpoint == "ompt_scope_begin":
+                            stack.append(event)
+                        else:
+                            stack.pop()
+                    if isinstance(event, ParallelEndEvent):
+                        stack.pop()
+                    if not stack:
+                        last_event = event
+                        break
+            
+            print(f"thread: {thread_number} first_event: {first_event} last_event: {last_event}")
+
+            # Extract events within the boundary
+            events_in_section = [
+                event for event in events
+                if first_event.time <= event.time <= last_event.time
+            ]
+            
+            # Initialize tracking variables
+            prev_event = first_event
+
+            for event in events_in_section[1:]:
+                delta_time = event.time - prev_event.time
+                
+                # TODO... need to strictly define what "work" time is so we can accurately measure it. Most likely defined as time within an implicit task that isn't in mutex or time between task switch and complete that isn't in mutex
+
+                if isinstance(prev_event, SyncRegionWaitEvent):
+                    sections[section_name][f"Thread {thread_number}"]["Mutex"] += delta_time
+                elif prev_event.event == "Mutex Acquire":
+                    sections[section_name][f"Thread {thread_number}"]["Mutex"] += delta_time
+                elif prev_event.event == "Mutex Acquired":
+                    sections[section_name][f"Thread {thread_number}"]["Critical"] += delta_time
+                
+                prev_event = event
+
+    return sections
 
 def plot_dag(nodes: List['GraphNode'], file_path: str):
     import matplotlib.pyplot as plt
@@ -539,7 +625,7 @@ def generate_graph_folder():
 
 def main():
     folder_name = generate_graph_folder()
-    log_folder_name = "logs/tasks from single"
+    log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     for thread_number, events in thread_num_to_events.items():
         print(f"Thread {thread_number}:")
@@ -550,6 +636,9 @@ def main():
     
     graph_nodes = create_graph_for_dependency_viz(thread_num_to_events)
     plot_dependency_viz(graph_nodes, folder_name)
+
+    time_spent_by_section = get_time_spent_by_section(thread_num_to_events)
+    print(time_spent_by_section)
 
 if __name__ == "__main__":
     main()
