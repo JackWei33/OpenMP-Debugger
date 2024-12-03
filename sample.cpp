@@ -105,20 +105,41 @@ int main()
     // }
 
     /* Example 5: Taskloop */
+    // #pragma omp parallel num_threads(4)
+    // {
+    //     #pragma omp single
+    //     {
+    //         #pragma omp taskloop num_tasks(5)
+    //         for (int i = 0; i < 10; i++) {
+    //             int pid = omp_get_thread_num();
+    //             std::cout << "Task " << i << " executed by thread " << pid << std::endl;
+    //             sum++;
+    //         }
+    //     }
+    // }
+
+    /* Example 6: Barrier and critical */
     #pragma omp parallel num_threads(4)
     {
         #pragma omp single
         {
-            #pragma omp taskloop num_tasks(5)
-            for (int i = 0; i < 10; i++) {
-                int pid = omp_get_thread_num();
-                std::cout << "Task " << i << " executed by thread " << pid << std::endl;
-                sum++;
-            }
+            std::cout << "Single thread before barrier" << std::endl;
+        }
+
+        #pragma omp barrier
+
+        #pragma omp critical
+        {
+            int pid = omp_get_thread_num();
+            std::cout << "Thread " << pid << " in critical section" << std::endl;
+            sum++;
+        }
+
+        #pragma omp single
+        {
+            std::cout << "Single thread after barrier" << std::endl;
         }
     }
-
-    /* Example 6: Barrier and critical */
 
     // // Sleep for 1 second
     // std::this_thread::sleep_for(std::chrono::seconds(1));
