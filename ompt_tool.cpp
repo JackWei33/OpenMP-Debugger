@@ -4,6 +4,9 @@
 #include <fstream>
 #include <chrono>
 #include "helper.h"
+#include <vector>
+#include <string>
+#include <utility>
 
 ompt_function_lookup_t global_lookup = NULL;
 long long start_time;
@@ -36,6 +39,7 @@ void log_event(uint64_t thread_id, const std::string &event_type, const std::vec
 
     outFile << "--------------------------" << std::endl;
 }
+
 // Callback for parallel region start
 void on_parallel_begin(ompt_data_t *task_data, const ompt_frame_t *task_frame,
                        ompt_data_t *parallel_data, uint32_t requested_parallelism,
@@ -135,17 +139,22 @@ void on_implicit_task(ompt_scope_endpoint_t endpoint, ompt_data_t *parallel_data
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
+    
+    ompt_get_parallel_info_t ompt_get_parallel_info = (ompt_get_parallel_info_t)global_lookup("ompt_get_parallel_info");
+    int team_size;
+    ompt_get_parallel_info(0, &parallel_data, &team_size);
 
-    if (parallel_data) {
-        task_data->value = parallel_data->value;
-    }
+    int task_number = global_task_number;
+    #pragma omp atomic
+    global_task_number++;
 
     log_event(thread_id, "Implicit Task", {
+        {"Task Number", std::to_string(task_number)},
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
         {"Actual Parallelism", std::to_string(actual_parallelism)},
         {"Index", std::to_string(index)},
         {"Flags", std::to_string(flags)},
-        {"Parallel ID", task_data ? std::to_string(task_data->value) : "N/A"}
+        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"}
     });
 }
 
@@ -174,12 +183,8 @@ void on_sync_region(ompt_sync_region_t kind,
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    if (parallel_data) {
-        task_data->value = parallel_data->value;
-    }
-
     log_event(thread_id, "Sync Region", {
-        {"Parallel ID", task_data ? std::to_string(task_data->value) : "N/A"},
+        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"},
         {"Kind", ompt_sync_region_t_to_string(kind)},
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
         {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
@@ -255,12 +260,8 @@ void on_sync_region_wait(ompt_sync_region_t kind,
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    if (parallel_data) {
-        task_data->value = parallel_data->value;
-    }
-
     log_event(thread_id, "Sync Region Wait", {
-        {"Parallel ID", task_data ? std::to_string(task_data->value) : "N/A"},
+        {"Parallel ID", parallel_data ? std::to_string(parallel_data->value) : "N/A"},
         {"Kind", ompt_sync_region_t_to_string(kind)},
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
         {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}

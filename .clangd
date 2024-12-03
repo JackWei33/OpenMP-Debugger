@@ -1,2 +1,4 @@
 CompileFlags:
-    Add: [-std=c++20, -fopenmp]
+    Add: 
+        - "-std=c++20"
+        - "-I/usr/local/opt/libomp/include"
