@@ -301,12 +301,20 @@ def extract_parallel_id(event: LogEvent):
     return None
 
 def create_graph_for_dependency_viz(thread_num_to_events: dict):
-    """ get all parallel ids """
+    """ get all disjoint parallel ids """
+    # Only get parallel ids that are disjoint. Assume that all disjoint parallel regions are started by thread 0.
     parallel_ids = set()
-    for _, events in thread_num_to_events.items():
+    stack = []
+    for thread, events in thread_num_to_events.items():
+        if thread != 0:
+            continue
         for event in events:
             if isinstance(event, ParallelEvent):
-                parallel_ids.add(event.parallel_id)
+                if not stack:
+                    parallel_ids.add(event.parallel_id)
+                stack.append(event)
+            elif isinstance(event, ParallelEndEvent):
+                stack.pop()
 
     """ for each parallel id, for each thread, get the boundary events """
     parallel_id_to_thread_to_boundary_events = {}
@@ -317,7 +325,7 @@ def create_graph_for_dependency_viz(thread_num_to_events: dict):
             last_event = None
             stack = []
             for event in events:
-                if extract_parallel_id(event) == parallel_id and first_event is None:
+                if first_event is None and extract_parallel_id(event) == parallel_id and isinstance(event, ImplicitTaskEvent) and event.endpoint == "ompt_scope_begin":
                     first_event = event
                     stack.append(event)
                 elif first_event is not None:
@@ -326,12 +334,11 @@ def create_graph_for_dependency_viz(thread_num_to_events: dict):
                             stack.append(event)
                         else:
                             stack.pop()
-                    if isinstance(event, ParallelEndEvent):
-                        stack.pop()
                     if not stack:
                         last_event = event
                         break
-            parallel_id_to_thread_to_boundary_events[parallel_id][thread_number] = (first_event, last_event)
+            if (first_event is not None) and (last_event is not None):
+                parallel_id_to_thread_to_boundary_events[parallel_id][thread_number] = (first_event, last_event)
     
     """ for each parallel id, for each thread, get all events that fit within the first and last event of the parallel id """
     parallel_id_to_graph_nodes = {}
@@ -340,45 +347,54 @@ def create_graph_for_dependency_viz(thread_num_to_events: dict):
         task_number_to_creation_node = {}
         task_number_to_switch_node = {}
         task_number_to_complete_node = {}
-        thread_to_barrier_nodes = {}
+        # thread_to_barrier_nodes = {}
         begin_event = None
         end_event = None
 
         for _, events in thread_num_to_events.items():
             for event in events:
-                if isinstance(event, ParallelEvent):
+                if isinstance(event, ParallelEvent) and extract_parallel_id(event) == parallel_id:
                     begin_event = GraphNode(event=event)
                     graph_nodes.append(begin_event)
-                elif isinstance(event, ParallelEndEvent):
+                elif isinstance(event, ParallelEndEvent) and extract_parallel_id(event) == parallel_id:
                     end_event = GraphNode(event=event)
                     graph_nodes.append(end_event)
                     
         for thread_number, events in thread_num_to_events.items():
+            if thread_number not in thread_to_boundary_events:
+                continue
             prev_nodes = [begin_event]
             for event in events:
-                if thread_to_boundary_events[thread_number][0].time <= event.time <= thread_to_boundary_events[thread_number][1].time:
-                    node = GraphNode(event=event)
-                    if isinstance(event, SyncRegionWaitEvent) or isinstance(event, ParallelEvent) or isinstance(event, ParallelEndEvent):
-                        continue
-                    elif isinstance(event, TaskCreateEvent):
-                        task_number_to_creation_node[event.task_number] = node
-                        for prev_node in prev_nodes:
-                            prev_node.children.append(node)
-                    elif isinstance(event, TaskScheduleEvent):
-                        if event.prior_task_status == "ompt_task_switch":
-                            task_number_to_switch_node[event.next_task_data] = node
-                        elif event.prior_task_status == "ompt_task_complete":
-                            task_number_to_complete_node[event.prior_task_data] = node
-                            prev_nodes.append(node)
-                    else:
-                        if isinstance(event, SyncRegionEvent):
-                            if thread_number not in thread_to_barrier_nodes:
-                                thread_to_barrier_nodes[thread_number] = []
-                            thread_to_barrier_nodes[thread_number].append((node, prev_nodes))
-                        for prev_node in prev_nodes:
-                            prev_node.children.append(node)
-                        prev_nodes = [node]
-                    graph_nodes.append(node)
+                # event.time
+                # thread_to_boundary_events[thread_number][0].time
+                # if (thread_to_boundary_events[thread_number][1] == None):
+                #     print(f"thread: {thread_number} first_event: {thread_to_boundary_events[thread_number][0]} last_event: {thread_to_boundary_events[thread_number][1]}")
+                if not (thread_to_boundary_events[thread_number][0].time <= event.time <= thread_to_boundary_events[thread_number][1].time):
+                    continue
+
+                node = GraphNode(event=event)
+                if isinstance(event, SyncRegionWaitEvent) or (isinstance(event, ParallelEvent) and extract_parallel_id(event) == parallel_id) or (isinstance(event, ParallelEndEvent) and extract_parallel_id(event) == parallel_id): # 
+                    continue
+                elif isinstance(event, TaskCreateEvent):
+                    task_number_to_creation_node[event.task_number] = node
+                    for prev_node in prev_nodes:
+                        prev_node.children.append(node)
+                elif isinstance(event, TaskScheduleEvent):
+                    if event.prior_task_status == "ompt_task_switch":
+                        task_number_to_switch_node[event.next_task_data] = node
+                    elif event.prior_task_status == "ompt_task_complete":
+                        task_number_to_complete_node[event.prior_task_data] = node
+                        prev_nodes.append(node)
+                else:
+                    # if isinstance(event, SyncRegionEvent):
+                    #     if thread_number not in thread_to_barrier_nodes:
+                    #         thread_to_barrier_nodes[thread_number] = []
+                    #     thread_to_barrier_nodes[thread_number].append((node, prev_nodes))
+                    for prev_node in prev_nodes:
+                        prev_node.children.append(node)
+                    prev_nodes = [node]
+                graph_nodes.append(node)
+
             for prev_node in prev_nodes:
                 prev_node.children.append(end_event)
                 
@@ -389,8 +405,8 @@ def create_graph_for_dependency_viz(thread_num_to_events: dict):
             schedule_node.children.append(complete_node)
             
         # assert all threads have the same number of barrier nodes
-        num_barrier_nodes = [len(barrier_nodes) for barrier_nodes in thread_to_barrier_nodes.values()]
-        assert len(set(num_barrier_nodes)) == 1, "All threads must have the same number of barrier nodes"
+        # num_barrier_nodes = [len(barrier_nodes) for barrier_nodes in thread_to_barrier_nodes.values()]
+        # assert len(set(num_barrier_nodes)) == 1, "All threads must have the same number of barrier nodes"
         
         # barrier logic
           
@@ -614,8 +630,8 @@ def plot_dag_with_time(nodes: List['GraphNode'], file_path: str):
 def plot_dependency_viz(nodes: List['GraphNode'], folder_name: str):
     for parallel_id, graph_nodes in nodes.items():
         plot_thread_col_vs_time_viz(graph_nodes, f"{folder_name}/{parallel_id}_dag_col_vs_time")
-        plot_dag(graph_nodes, f"{folder_name}/{parallel_id}_dag")
-        plot_dag_with_time(graph_nodes, f"{folder_name}/{parallel_id}_dag_with_time")
+        # plot_dag(graph_nodes, f"{folder_name}/{parallel_id}_dag")
+        # plot_dag_with_time(graph_nodes, f"{folder_name}/{parallel_id}_dag_with_time")
 
 def generate_graph_folder():
     now = datetime.datetime.now()
@@ -631,14 +647,14 @@ def main():
         print(f"Thread {thread_number}:")
         for event in events:
             print(f"  {event} {event.unique_id}")
-    graph_nodes = create_graph_for_thread_col_vs_time_viz(thread_num_to_events)
-    plot_thread_col_vs_time_viz(graph_nodes, f"{folder_name}/thread_col_vs_time")
+    # graph_nodes = create_graph_for_thread_col_vs_time_viz(thread_num_to_events)
+    # plot_thread_col_vs_time_viz(graph_nodes, f"{folder_name}/thread_col_vs_time")
     
     graph_nodes = create_graph_for_dependency_viz(thread_num_to_events)
     plot_dependency_viz(graph_nodes, folder_name)
 
-    time_spent_by_section = get_time_spent_by_section(thread_num_to_events)
-    print(time_spent_by_section)
+    # time_spent_by_section = get_time_spent_by_section(thread_num_to_events)
+    # print(time_spent_by_section)
 
 if __name__ == "__main__":
     main()

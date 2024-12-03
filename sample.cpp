@@ -118,28 +118,35 @@ int main()
     //     }
     // }
 
-    /* Example 6: Barrier and critical */
-    #pragma omp parallel num_threads(4)
+    // /* Example 6: Barrier and critical */
+    #pragma omp parallel num_threads(2)
     {
-        #pragma omp single
-        {
-            std::cout << "Single thread before barrier" << std::endl;
-        }
-
-        #pragma omp barrier
-
         #pragma omp critical
         {
-            int pid = omp_get_thread_num();
-            std::cout << "Thread " << pid << " in critical section" << std::endl;
             sum++;
         }
+    }
 
-        #pragma omp single
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp critical
         {
-            std::cout << "Single thread after barrier" << std::endl;
+            sum++;
         }
     }
+
+    // #pragma omp parallel num_threads(2) 
+    // {
+    //     #pragma omp parallel num_threads(2) 
+    //     {
+    //         #pragma omp critical
+    //         {
+    //             sum++;
+    //         }
+    //     }
+    // }
+
+    
 
     // // Sleep for 1 second
     // std::this_thread::sleep_for(std::chrono::seconds(1));
