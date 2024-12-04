@@ -7,6 +7,14 @@ import os
 import uuid
 from enum import Enum
 import plotly.express as px
+from collections import defaultdict
+
+
+def convert_defaultdict_to_dict(d):
+    """ Recursively convert a defaultdict to a regular dict. """
+    if isinstance(d, defaultdict):
+        d = {k: convert_defaultdict_to_dict(v) for k, v in d.items()}
+    return d
 
 @dataclass
 class LogEvent:
@@ -216,7 +224,7 @@ def create_event(event_dict, thread_number: int):
 
 def get_time_spent_by_section(thread_num_to_events: dict):
     """ 
-    Calculates the time spent by each thread in different sections within each parallel section.
+    Calculates the time spent synchronizing by each thread in different sections within each parallel section.
 
     Returns a dictionary in the following format:
     {
@@ -334,9 +342,96 @@ def get_time_spent_by_section(thread_num_to_events: dict):
             total_time = parallel_id_to_thread_to_total_time[parallel_id][thread]
             spent_time = sum(sections[parallel_id][thread].values())
             sections[parallel_id][thread]["Working"] = total_time - spent_time
-            
+    
     return sections
 
+def get_time_spent_by_task(thread_num_to_events: dict):
+    """ 
+    Calculates the time spent in each task by each thread in different sections within each parallel section.
+
+    Returns a dictionary in the following format:
+    {
+        'Parallel Section 1': {
+            'Thread 0': {'Task 1': 5, 'Task 2': 3, 'Task 3': 2},
+            'Thread 1': {'Task 4': 4, 'Task 5': 6, 'Task 6': 1},
+            ...
+        },
+        'Parallel Section 2': {
+            ...
+        },
+        ...
+    }
+    """
+    sections = defaultdict(lambda : defaultdict(lambda : defaultdict(int)))
+    # Only get parallel ids that are disjoint. Assume that all disjoint parallel regions are started by thread 0.
+    parallel_ids = set()
+    stack = []
+    for thread, events in thread_num_to_events.items():
+        if thread != 0:
+            continue
+        for event in events:
+            if isinstance(event, ParallelEvent):
+                if not stack:
+                    parallel_ids.add(event.parallel_id)
+                stack.append(event)
+            elif isinstance(event, ParallelEndEvent):
+                stack.pop()
+
+    # Get start and end events for each parallel section
+    parallel_id_to_thread_to_boundary_events = {}
+    for parallel_id in parallel_ids: 
+        parallel_id_to_thread_to_boundary_events[parallel_id] = {}
+        for thread_number, events in thread_num_to_events.items():
+            first_event = None
+            last_event = None
+            stack = []
+            for event in events:
+                if first_event is None and extract_parallel_id(event) == parallel_id and isinstance(event, ImplicitTaskEvent) and event.endpoint == "ompt_scope_begin":
+                    first_event = event
+                    stack.append(event)
+                elif first_event is not None:
+                    if isinstance(event, ImplicitTaskEvent):
+                        if event.endpoint == "ompt_scope_begin":
+                            stack.append(event)
+                        else:
+                            stack.pop()
+                    if not stack:
+                        last_event = event
+                        break
+            if (first_event is not None) and (last_event is not None):
+                parallel_id_to_thread_to_boundary_events[parallel_id][thread_number] = (first_event, last_event)
+    
+    # Get total time spent by each thread in each task
+    for parallel_id in parallel_id_to_thread_to_boundary_events:
+        for thread in parallel_id_to_thread_to_boundary_events[parallel_id]:
+            first_event, last_event = parallel_id_to_thread_to_boundary_events[parallel_id][thread]
+            events = thread_num_to_events[thread]
+            stack = []
+
+            for event in events:
+                if not (first_event.time <= event.time <= last_event.time):
+                    continue
+                if isinstance(event, ImplicitTaskEvent) and event.endpoint == "ompt_scope_begin":
+                    stack.append(event)
+                elif isinstance(event, ImplicitTaskEvent) and event.endpoint == "ompt_scope_end":
+                    prev_event = stack.pop()
+                    assert((isinstance(prev_event, ImplicitTaskEvent) and prev_event.task_number == event.task_number) \
+                        or (isinstance(prev_event, TaskScheduleEvent) and prev_event.next_task_data == event.task_number))
+                    sections[parallel_id][thread]["Task " + str(event.task_number)] += event.time - prev_event.time
+                elif isinstance(event, TaskScheduleEvent):
+                    # Task Schedule Event is essentially an end TaskEvent and then a start TaskEvent
+                    prev_event = stack.pop()
+                        
+                    assert((isinstance(prev_event, ImplicitTaskEvent) and prev_event.task_number == event.prior_task_data) \
+                        or (isinstance(prev_event, TaskScheduleEvent) and prev_event.next_task_data == event.prior_task_data))
+                    sections[parallel_id][thread]["Task " + str(event.prior_task_data)] += event.time - prev_event.time
+                    
+                    stack.append(event)
+
+    sections = convert_defaultdict_to_dict(sections)
+    return sections
+                    
+                    
 def create_stacked_bar_chart(parallel_sections_data, sections):
     """
     Creates and displays a stacked bar chart using Plotly for each parallel section.
@@ -348,7 +443,7 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
     """
     # Fill in section colors
     color_scale = px.colors.qualitative.Plotly
-    section_colors = {section: color_scale[i % len(color_scale)] for i, section in enumerate(sections)}
+    section_colors = {section: color_scale[i % len(color_scale)] for i, section in enumerate(sorted(sections))}
 
     num_sections = len(parallel_sections_data)
     subplot_titles = list(parallel_sections_data.keys())
@@ -356,19 +451,21 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
     # Create subplots with a variable number of columns
     fig = make_subplots(rows=1, cols=num_sections, subplot_titles=subplot_titles)
 
+    # Sort sections for consistent legend order
+    sorted_sections = sorted(sections)
+
     for pos, (parallel_id, thread_data) in enumerate(parallel_sections_data.items()):
-        # Extract thread names and section names
+        # Extract thread names
         threads = list(thread_data.keys())
-        sections = list(next(iter(thread_data.values())).keys())
 
         # Prepare data for plotting
-        section_times = {section: [] for section in sections}
+        section_times = {section: [] for section in sorted_sections}
         for thread in threads:
-            for section in sections:
+            for section in sorted_sections:
                 section_times[section].append(thread_data[thread].get(section, 0))
 
         # Add a bar for each section
-        for section in sections:
+        for section in sorted_sections:
             fig.add_trace(go.Bar(
                 name=section,
                 x=threads,
@@ -376,7 +473,7 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
                 marker_color=section_colors[section],
                 hovertemplate=(
                     'Thread: %{x}<br>' +
-                    'Section: ' + section + '<br>' +
+                    'Section: ' + str(section) + '<br>' +
                     'Time Spent: %{y}<extra></extra>'
                 ),
                 showlegend=(pos == 0),  # Show legend only for the first subplot
@@ -394,6 +491,7 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
     # Show the plot
     fig.show()
 
+
 def make_synchronization_bar_chart():
     log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
@@ -403,5 +501,19 @@ def make_synchronization_bar_chart():
 
     create_stacked_bar_chart(parallel_sections_data, sections)
 
+def make_task_bar_chart():
+    log_folder_name = "logs/"
+    thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
+    parallel_sections_data = get_time_spent_by_task(thread_num_to_events)
+
+    sections = set()
+    for parallel_id in parallel_sections_data:
+        for thread in parallel_sections_data[parallel_id]:
+            for task in parallel_sections_data[parallel_id][thread]:
+                sections.add(task)
+
+    create_stacked_bar_chart(parallel_sections_data, sections)
+
 if __name__ == "__main__":
     make_synchronization_bar_chart()
+    make_task_bar_chart()
