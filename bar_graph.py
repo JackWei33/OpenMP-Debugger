@@ -239,6 +239,7 @@ def get_time_spent_by_section(thread_num_to_events: dict):
         ...
     }
     """
+    sections = defaultdict(lambda : defaultdict(lambda : defaultdict(int)))
     section_keys = ["Working", "Critical", "Lock", "Implicit Barrier", "Barrier", "Other"]
 
     # Only get parallel ids that are disjoint. Assume that all disjoint parallel regions are started by thread 0.
@@ -254,14 +255,6 @@ def get_time_spent_by_section(thread_num_to_events: dict):
                 stack.append(event)
             elif isinstance(event, ParallelEndEvent):
                 stack.pop()
-
-    # Initalize sections
-    sections = {}
-    for parallel_id in parallel_ids:
-        sections[parallel_id] = {}
-        for thread in thread_num_to_events:
-            d = {k : 0 for k in section_keys}
-            sections[parallel_id][thread] = d
 
     # Get start and end events for each parallel section
     parallel_id_to_thread_to_boundary_events = {}
@@ -428,7 +421,22 @@ def get_time_spent_by_task(thread_num_to_events: dict):
                     
                     stack.append(event)
 
-    sections = convert_defaultdict_to_dict(sections)
+    # Add global view of parallel sections
+    thread_to_total_time = {}
+    for thread, events in thread_num_to_events.items():
+        first_event = events[0]
+        last_event = events[-1]
+        thread_to_total_time[thread] = last_event.time - first_event.time
+
+    for parallel_id in parallel_id_to_thread_to_boundary_events:
+        for thread in parallel_id_to_thread_to_boundary_events[parallel_id]:
+            first_event, last_event = parallel_id_to_thread_to_boundary_events[parallel_id][thread]
+            total_time = last_event.time - first_event.time
+            sections["Global"][thread][f"Parallel id {parallel_id}"] = total_time
+    
+    for thread in thread_to_total_time:
+        sections["Global"][thread]["Non Parallel Work"] = thread_to_total_time[thread] - sum(sections["Global"][thread].values())
+
     return sections
                     
                     
@@ -452,7 +460,7 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
     fig = make_subplots(rows=1, cols=num_sections, subplot_titles=subplot_titles)
 
     # Sort sections for consistent legend order
-    sorted_sections = sorted(sections)
+    sorted_sections = sorted(sections, key=lambda x: (len(str(x)), str(x)))
 
     for pos, (parallel_id, thread_data) in enumerate(parallel_sections_data.items()):
         # Extract thread names

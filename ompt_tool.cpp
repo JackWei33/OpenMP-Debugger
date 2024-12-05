@@ -111,7 +111,7 @@ void on_task_create(ompt_data_t *parent_task_data, const ompt_frame_t *parent_ta
     new_task_data->value = task_number;
 
     log_event(thread_id, "Task Create", {
-        {"Task Number", std::to_string(task_number)},
+        {"Task Number", std::to_string(new_task_data->value)},
         {"Parent Task Number", std::to_string(parent_task_data->value)},
         {"Flags", std::to_string(flags)},
         {"Has Dependences", std::to_string(has_dependences)},
@@ -144,12 +144,15 @@ void on_implicit_task(ompt_scope_endpoint_t endpoint, ompt_data_t *parallel_data
     int team_size;
     ompt_get_parallel_info(0, &parallel_data, &team_size);
 
-    int task_number = global_task_number;
-    #pragma omp atomic
-    global_task_number++;
+    if (endpoint == ompt_scope_begin) {
+        task_data->value = global_task_number;
+        #pragma omp atomic
+        global_task_number++;
+    }
+    
 
     log_event(thread_id, "Implicit Task", {
-        {"Task Number", std::to_string(task_number)},
+        {"Task Number", std::to_string(task_data->value)},
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
         {"Actual Parallelism", std::to_string(actual_parallelism)},
         {"Index", std::to_string(index)},

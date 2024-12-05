@@ -11,10 +11,11 @@ long long get_time_microsecond() {
     return micros;
 }
 
-void my_func(int sum) {
-    // Critical region to update sum
-    #pragma omp critical
+void my_func(int& sum, omp_lock_t& lock) {
+    // Use lock to update sum
+    omp_set_lock(&lock);
     sum++;
+    omp_unset_lock(&lock);
 }
 
 int main()
@@ -105,46 +106,45 @@ int main()
     // }
 
     /* Example 5: Taskloop */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp single
-    //     {
-    //         #pragma omp taskloop num_tasks(5)
-    //         for (int i = 0; i < 10; i++) {
-    //             int pid = omp_get_thread_num();
-    //             std::cout << "Task " << i << " executed by thread " << pid << std::endl;
-    //             sum++;
-    //         }
-    //     }
-    // }
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp single
+        {
+            #pragma omp taskloop num_tasks(5)
+            for (int i = 0; i < 10; i++) {
+                int pid = omp_get_thread_num();
+                std::cout << "Task " << i << " executed by thread " << pid << std::endl;
+                sum++;
+            }
+        }
+    }
 
     // /* Example 6: Barrier and critical */
+    omp_lock_t lock;
+    omp_init_lock(&lock);
+
     #pragma omp parallel num_threads(2)
     {
-        #pragma omp critical
-        {
-            sum++;
-        }
+        my_func(sum, lock);
     }
 
     #pragma omp parallel num_threads(4)
     {
-        #pragma omp critical
+        my_func(sum, lock);
+        #pragma omp barrier
+    }
+    omp_destroy_lock(&lock);
+
+    #pragma omp parallel num_threads(2) 
+    {
+        #pragma omp parallel num_threads(2) 
         {
-            sum++;
+            #pragma omp critical
+            {
+                sum++;
+            }
         }
     }
-
-    // #pragma omp parallel num_threads(2) 
-    // {
-    //     #pragma omp parallel num_threads(2) 
-    //     {
-    //         #pragma omp critical
-    //         {
-    //             sum++;
-    //         }
-    //     }
-    // }
 
     
 
