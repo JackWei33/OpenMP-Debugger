@@ -18,50 +18,58 @@ void my_func(int& sum, omp_lock_t& lock) {
     omp_unset_lock(&lock);
 }
 
+// void parallel_func(int& sum) {
+//     #pragma omp parallel num_threads(3)
+//     {
+//         #pragma omp critical
+//         sum++;
+//     }
+// }
+
 int main()
 {
     long long start_time = get_time_microsecond();
     int sum = 0;
 
     /* Example 1: Tasks spawn from single */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp single
-    //     {
-    //         for (int i = 0; i < 5; ++i) {
-    //             #pragma omp task firstprivate(i)
-    //             {
-    //                 std::cout << "Task " << i << " executed by thread " << omp_get_thread_num() << std::endl;
-    //                 // my_func(sum);
-    //                 sum++;
-    //             }
-    //         }
-    //     }
-    // }
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp single
+        {
+            for (int i = 0; i < 5; ++i) {
+                #pragma omp task firstprivate(i)
+                {
+                    std::cout << "Task " << i << " executed by thread " << omp_get_thread_num() << std::endl;
+                    // my_func(sum);
+                    sum++;
+                }
+            }
+        }
+    }
 
     /* Example 2: Tasks spawn from parallel */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp task
-    //     {
-    //         int pid = omp_get_thread_num();
-    //         std::cout << "Task 1 executed by thread " << pid << std::endl;
-    //         if (pid == 0) {
-    //             std::this_thread::sleep_for(std::chrono::seconds(1));
-    //         }
-    //         sum++;
-    //     }
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp task
+        {
+            int pid = omp_get_thread_num();
+            std::cout << "Task 1 executed by thread " << pid << std::endl;
+            if (pid == 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            sum++;
+        }
 
-    //     #pragma omp task
-    //     {
-    //         int pid = omp_get_thread_num();
-    //         std::cout << "Task 2 executed by thread " << pid << std::endl;
-    //         if (pid == 0) {
-    //             std::this_thread::sleep_for(std::chrono::seconds(1));
-    //         }
-    //         sum++;
-    //     }
-    // }
+        #pragma omp task
+        {
+            int pid = omp_get_thread_num();
+            std::cout << "Task 2 executed by thread " << pid << std::endl;
+            if (pid == 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            sum++;
+        }
+    }
 
     /* Example 3: Tasks spawn from tasks */
     // #pragma omp parallel num_threads(4)
@@ -106,45 +114,46 @@ int main()
     // }
 
     /* Example 5: Taskloop */
-    #pragma omp parallel num_threads(4)
-    {
-        #pragma omp single
-        {
-            #pragma omp taskloop num_tasks(5)
-            for (int i = 0; i < 10; i++) {
-                int pid = omp_get_thread_num();
-                std::cout << "Task " << i << " executed by thread " << pid << std::endl;
-                sum++;
-            }
-        }
-    }
+    // #pragma omp parallel num_threads(4)
+    // {
+    //     #pragma omp single
+    //     {
+    //         #pragma omp taskloop num_tasks(5)
+    //         for (int i = 0; i < 10; i++) {
+    //             int pid = omp_get_thread_num();
+    //             std::cout << "Task " << i << " executed by thread " << pid << std::endl;
+    //             sum++;
+    //         }
+    //     }
+    // }
 
     // /* Example 6: Barrier and critical */
-    omp_lock_t lock;
-    omp_init_lock(&lock);
+    // omp_lock_t lock;
+    // omp_init_lock(&lock);
 
-    #pragma omp parallel num_threads(2)
-    {
-        my_func(sum, lock);
-    }
+    // #pragma omp parallel num_threads(2)
+    // {
+    //     my_func(sum, lock);
+    // }
 
-    #pragma omp parallel num_threads(4)
-    {
-        my_func(sum, lock);
-        #pragma omp barrier
-    }
-    omp_destroy_lock(&lock);
+    // #pragma omp parallel num_threads(4)
+    // {
+    //     my_func(sum, lock);
+    //     #pragma omp barrier
+    // }
+    // omp_destroy_lock(&lock);
 
-    #pragma omp parallel num_threads(2) 
-    {
-        #pragma omp parallel num_threads(2) 
-        {
-            #pragma omp critical
-            {
-                sum++;
-            }
-        }
-    }
+    // omp_set_nested(1);
+    // omp_set_max_active_levels(3);
+    // #pragma omp parallel num_threads(2) 
+    // {
+    //     // parallel_func(sum);
+    //     #pragma omp parallel for num_threads(3)
+    //     for (int i = 0; i < 100; i++) {
+    //         std::cout << "Thread " << omp_get_thread_num() << " executing iteration " << i << std::endl;
+    //         sum++;
+    //     }
+    // }
 
     
 
@@ -176,6 +185,32 @@ int main()
     //     sum++;
     // }
 
+    // omp_set_max_active_levels(3);
+    // omp_set_max_active_levels(1);
+    // #pragma omp parallel num_threads(4)
+    // {
+    //     //do something on 4 threads
+    //     #pragma omp parallel for num_threads(2)
+    //     for(int i=0;i<10;i++){
+    //         std::cout << "Thread " << omp_get_thread_num() << " executing iteration " << i << std::endl;
+    //         std::cout << "Total threads: " << omp_get_num_threads() << std::endl;
+    //         //do something on 8 threads in total
+    //     }
+    // }
+
+    // // mutex with task creation inside of it
+    omp_lock_t lock;
+    omp_init_lock(&lock);
+    #pragma omp parallel num_threads(2)
+    {
+        omp_set_lock(&lock);
+        #pragma omp task
+        {
+            sum++;
+        }
+        omp_unset_lock(&lock);
+    }
+    omp_destroy_lock(&lock);
 
     // #pragma omp parallel
     // {

@@ -30,14 +30,18 @@ void log_event(uint64_t thread_id, const std::string &event_type, const std::vec
     std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
     outFile.open(filename, std::ios::app);
 
-    outFile << "Time: " << (get_time_microsecond() - start_time) << " µs" << std::endl;
-    outFile << "Event: " << event_type << std::endl;
+    std::string log_message;
+    log_message += "Time: " + std::to_string(get_time_microsecond() - start_time) + " µs\n";
+    log_message += "Event: " + event_type + "\n";
 
     for (const auto &detail : details) {
-        outFile << detail.first << ": " << detail.second << std::endl;
+        log_message += detail.first + ": " + detail.second + "\n";
     }
 
-    outFile << "--------------------------" << std::endl;
+    log_message += "--------------------------\n";
+
+    outFile << log_message;
+    outFile.flush();  // Ensure the write is completed
 }
 
 // Callback for parallel region start
@@ -165,6 +169,7 @@ void on_implicit_task(ompt_scope_endpoint_t endpoint, ompt_data_t *parallel_data
 void on_thread_create(ompt_thread_t thread_type, ompt_data_t *thread_data)
 {
     int omp_thread_num = omp_get_thread_num();
+    
     thread_data->value = (uint64_t)omp_get_thread_num();
 
     wipe_log(omp_thread_num);
