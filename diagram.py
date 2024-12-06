@@ -159,7 +159,7 @@ def parse_log(lines: str, thread_number: int):
 # Slightly modified
 def create_event(event_dict, thread_number: int):
     """ Create an event object from a dictionary extracted from a log file. """
-    time = int(event_dict["time"].split()[0])
+    time = round(int(event_dict["time"].split()[0]) / 1000000, 3)
     event = event_dict["event"]
     base_params = {
         "time": time,
@@ -338,11 +338,11 @@ def generate_dag(thread_num_to_events: Dict[int, List[LogEvent]]):
             elif isinstance(event, ParallelEndEvent):
                 parallel_id_to_end_node[event.parallel_id] = node
             elif isinstance(event, MutexAcquireEvent):
-                mutex_wait_id_to_nodes.setdefault(event.wait_id, {})['acquire'] = node
+                mutex_wait_id_to_nodes.setdefault((event.wait_id, event.thread_number), {})['acquire'] = node
             elif isinstance(event, MutexAcquiredEvent):
-                mutex_wait_id_to_nodes.setdefault(event.wait_id, {})['acquired'] = node
+                mutex_wait_id_to_nodes.setdefault((event.wait_id, event.thread_number), {})['acquired'] = node
             elif isinstance(event, MutexReleaseEvent):
-                mutex_wait_id_to_nodes.setdefault(event.wait_id, {})['release'] = node
+                mutex_wait_id_to_nodes.setdefault((event.wait_id, event.thread_number), {})['release'] = node
 
     # Step 2: Create dependency edges
     # a. Task dependencies
@@ -397,7 +397,7 @@ def generate_dag(thread_num_to_events: Dict[int, List[LogEvent]]):
                 last_node = event_nodes[last_event.unique_id]
                 last_node.add_child(EdgeType.NESTING, parallel_end_node)
     # c. Mutex dependencies
-    for wait_id, nodes in mutex_wait_id_to_nodes.items():
+    for (wait_id, thread_number), nodes in mutex_wait_id_to_nodes.items():
         acquire_node = nodes.get('acquire')
         acquired_node = nodes.get('acquired')
         release_node = nodes.get('release')
