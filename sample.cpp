@@ -11,219 +11,39 @@ long long get_time_microsecond() {
     return micros;
 }
 
-void my_func(int& sum, omp_lock_t& lock) {
-    // Use lock to update sum
-    omp_set_lock(&lock);
-    sum++;
-    omp_unset_lock(&lock);
-}
-
-int main()
-{
+int main() {
     long long start_time = get_time_microsecond();
     int sum = 0;
 
-    /* Example 1: Tasks spawn from single */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp single
-    //     {
-    //         for (int i = 0; i < 5; ++i) {
-    //             #pragma omp task firstprivate(i)
-    //             {
-    //                 std::cout << "Task " << i << " executed by thread " << omp_get_thread_num() << std::endl;
-    //                 // my_func(sum);
-    //                 sum++;
-    //             }
-    //         }
-    //     }
-    // }
-
-    /* Example 2: Tasks spawn from parallel */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp task
-    //     {
-    //         int pid = omp_get_thread_num();
-    //         std::cout << "Task 1 executed by thread " << pid << std::endl;
-    //         if (pid == 0) {
-    //             std::this_thread::sleep_for(std::chrono::seconds(1));
-    //         }
-    //         sum++;
-    //     }
-
-    //     #pragma omp task
-    //     {
-    //         int pid = omp_get_thread_num();
-    //         std::cout << "Task 2 executed by thread " << pid << std::endl;
-    //         if (pid == 0) {
-    //             std::this_thread::sleep_for(std::chrono::seconds(1));
-    //         }
-    //         sum++;
-    //     }
-    // }
-
-    /* Example 3: Tasks spawn from tasks */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp single
-    //     {
-    //         #pragma omp task
-    //         {
-    //             int pid = omp_get_thread_num();
-    //             std::cout << "Task 1 executed by thread " << pid << std::endl;
-    //             #pragma omp task
-    //             {
-    //                 int pid_inner = omp_get_thread_num();
-    //                 std::cout << "Task 1.1 executed by thread " << pid_inner << std::endl;
-    //                 sum++;
-    //             }
-    //             sum++;
-    //         }
-
-    //         #pragma omp task
-    //         {
-    //             int pid = omp_get_thread_num();
-    //             std::cout << "Task 2 executed by thread " << pid << std::endl;
-    //             #pragma omp task
-    //             {
-    //                 int pid_inner = omp_get_thread_num();
-    //                 std::cout << "Task 2.1 executed by thread " << pid_inner << std::endl;
-    //                 sum++;
-    //             }
-    //             sum++;
-    //         }
-    //     }
-    // }
-
-    /* Example 4: Parallel for */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp for
-    //     for (int i = 0; i < 5; i++) {
-    //         sum++;
-    //     }
-    // }
-
-    /* Example 5: Taskloop */
-    #pragma omp parallel num_threads(4)
-    {
-        #pragma omp single
-        {
-            #pragma omp taskloop num_tasks(5)
-            for (int i = 0; i < 10; i++) {
-                int pid = omp_get_thread_num();
-                std::cout << "Task " << i << " executed by thread " << pid << std::endl;
-                sum++;
-            }
-        }
-    }
-
-    // /* Example 6: Barrier and critical */
-    omp_lock_t lock;
-    omp_init_lock(&lock);
+    omp_lock_t lock1, lock2;
+    omp_init_lock(&lock1);
+    omp_init_lock(&lock2);
 
     #pragma omp parallel num_threads(2)
     {
-        my_func(sum, lock);
-    }
+        int tid = omp_get_thread_num();
 
-    #pragma omp parallel num_threads(4)
-    {
-        my_func(sum, lock);
-        #pragma omp barrier
-    }
-    omp_destroy_lock(&lock);
-
-    #pragma omp parallel num_threads(2) 
-    {
-        #pragma omp parallel num_threads(2) 
-        {
-            #pragma omp critical
-            {
-                sum++;
-            }
+        if (tid == 0) {
+            omp_set_lock(&lock1);
+            std::this_thread::sleep_for(std::chrono::microseconds(100)); // Simulate some work
+            omp_set_lock(&lock2);
+            // Critical section
+            sum += tid;
+            omp_unset_lock(&lock2);
+            omp_unset_lock(&lock1);
+        } else {
+            omp_set_lock(&lock2);
+            std::this_thread::sleep_for(std::chrono::microseconds(100)); // Simulate some work
+            omp_set_lock(&lock1);
+            // Critical section
+            sum += tid;
+            omp_unset_lock(&lock1);
+            omp_unset_lock(&lock2);
         }
     }
 
-    
-
-    // // Sleep for 1 second
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
-
-    // #pragma omp parallel num_threads(5)
-    // {
-    //     my_func(sum);
-    //     #pragma omp barrier
-    //     #pragma omp single
-    //     {
-    //         std::cout << "Single thread" << std::endl;
-
-    //         #pragma omp taskloop num_tasks(10)
-            
-    //     }
-    // }
-
-    // #pragma omp parallel for schedule(static, 1)
-    // for (int i = 0; i < 5; i++) {
-    //     #pragma omp critical
-    //     sum++;
-    // }
-
-    // #pragma omp parallel for schedule(static, 1)
-    // for (int i = 0; i < 5; i++) {
-    //     #pragma omp critical
-    //     sum++;
-    // }
-
-
-    // #pragma omp parallel
-    // {
-    //     #pragma omp single
-    //     sum++;
-
-    //     #pragma omp barrier
-
-    //     #pragma omp single 
-    //     sum++;
-
-    //     #pragma omp barrier
-
-    //     #pragma omp single 
-    //     {
-    //         sum++;
-    //     }
-    // }
-
-    // #pragma omp single ...
-    
-    // #pragma omp parallel num_threads(2)
-    // {
-    //     if (pid == 1) {
-    //         #pragma omp task 
-    //         {
-    //             // get_parallel_data... to link task to 
-    //         }
-    //     }
-    //     #pragma omp parallel for schedule(static, 1)
-    //     for (int i = 0; i < 2; i++) {
-    //         #pragma omp critical
-    //         sum*=2;
-    //     }
-    // }
-
-    // // Parallel region using OpenMP
-    // #pragma omp parallel num_threads(5)
-    // {
-    //     my_func(sum);
-    //     #pragma omp barrier
-    // }
-
-    // #pragma omp parallel num_threads(5)
-    // {
-    //     my_func(sum);
-    //     #pragma omp barrier
-    // }
+    omp_destroy_lock(&lock1);
+    omp_destroy_lock(&lock2);
 
     std::cout << "Output: " << sum << std::endl;
     std::cout << "Runtime: " << get_time_microsecond() - start_time << std::endl;

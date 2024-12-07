@@ -2,11 +2,13 @@
 #include <omp.h>
 #include <iostream>
 #include <fstream>
-#include <chrono>
+#include <chrono> 
 #include "helper.h"
+#include "dl_detector.h"
 #include <vector>
 #include <string>
 #include <utility>
+#include <thread>
 
 ompt_function_lookup_t global_lookup = NULL;
 long long start_time;
@@ -208,6 +210,8 @@ void on_mutex_acquire(
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
+    process_mutex_acquire(kind, wait_id, thread_id);
+
     log_event(thread_id, "Mutex Acquire", {
         {"Kind", ompt_mutex_t_to_string(kind)},
         {"Wait id", std::to_string(wait_id)},
@@ -226,6 +230,8 @@ void on_mutex_acquired(
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
+    process_mutex_acquired(kind, wait_id, thread_id);
+
     log_event(thread_id, "Mutex Acquired", {
         {"Kind", ompt_mutex_t_to_string(kind)},
         {"Wait id", std::to_string(wait_id)},
@@ -243,6 +249,8 @@ void on_mutex_released(
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
+
+    process_mutex_released(kind, wait_id, thread_id);
 
     log_event(thread_id, "Mutex Released", {
         {"Kind", ompt_mutex_t_to_string(kind)},
@@ -305,6 +313,9 @@ int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_
     {
         std::cerr << "Failed to retrieve ompt_set_callback.\n";
     }
+
+    std::thread(dl_detector_thread).detach();
+
     return 1; // Successful initialization
 }
 

@@ -132,3 +132,71 @@ std::string ompt_task_status_t_to_string(ompt_task_status_t taskStatus) {
             return "Unknown task status";
     }
 }
+
+
+std::string ompt_state_t_to_string(int state) {
+    switch (state) {
+        // undefined state
+        case ompt_state_undefined:
+            return "ompt_state_undefined";
+
+        // work states
+        case ompt_state_work_serial:
+            return "ompt_state_work_serial";
+        case ompt_state_work_parallel:
+            return "ompt_state_work_parallel";
+        case ompt_state_work_reduction:
+            return "ompt_state_work_reduction";
+
+        // barrier wait states
+        case ompt_state_wait_barrier:
+            return "ompt_state_wait_barrier";
+        case ompt_state_wait_barrier_implicit_parallel:
+            return "ompt_state_wait_barrier_implicit_parallel";
+        case ompt_state_wait_barrier_implicit_workshare:
+            return "ompt_state_wait_barrier_implicit_workshare";
+        case ompt_state_wait_barrier_implicit:
+            return "ompt_state_wait_barrier_implicit";
+        case ompt_state_wait_barrier_explicit:
+            return "ompt_state_wait_barrier_explicit";
+        case ompt_state_wait_barrier_implementation:
+            return "ompt_state_wait_barrier_implementation";
+        case ompt_state_wait_barrier_teams:
+            return "ompt_state_wait_barrier_teams";
+
+        // task wait states
+        case ompt_state_wait_taskwait:
+            return "ompt_state_wait_taskwait";
+        case ompt_state_wait_taskgroup:
+            return "ompt_state_wait_taskgroup";
+
+        // mutex wait states
+        case ompt_state_wait_mutex:
+            return "ompt_state_wait_mutex";
+        case ompt_state_wait_lock:
+            return "ompt_state_wait_lock";
+        case ompt_state_wait_critical:
+            return "ompt_state_wait_critical";
+        case ompt_state_wait_atomic:
+            return "ompt_state_wait_atomic";
+        case ompt_state_wait_ordered:
+            return "ompt_state_wait_ordered";
+
+        // target wait states
+        case ompt_state_wait_target:
+            return "ompt_state_wait_target";
+        case ompt_state_wait_target_map:
+            return "ompt_state_wait_target_map";
+        case ompt_state_wait_target_update:
+            return "ompt_state_wait_target_update";
+
+        // misc states
+        case ompt_state_idle:
+            return "ompt_state_idle";
+        case ompt_state_overhead:
+            return "ompt_state_overhead";
+
+        default:
+            return "Unknown state";
+    }
+}
