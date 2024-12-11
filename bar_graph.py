@@ -8,219 +8,8 @@ import uuid
 from enum import Enum
 import plotly.express as px
 from collections import defaultdict
+from diagram import *
 
-
-def convert_defaultdict_to_dict(d):
-    """ Recursively convert a defaultdict to a regular dict. """
-    if isinstance(d, defaultdict):
-        d = {k: convert_defaultdict_to_dict(v) for k, v in d.items()}
-    return d
-
-@dataclass
-class LogEvent:
-    time: int
-    event: str
-    thread_number: int
-
-    def __post_init__(self):
-        self.unique_id = str(uuid.uuid4())
-
-@dataclass
-class ThreadCreateEvent(LogEvent):
-    thread_type: str
-
-@dataclass
-class ImplicitTaskEvent(LogEvent):
-    task_number: int
-    endpoint: str
-    parallel_id: Optional[int]
-
-@dataclass
-class ParallelEvent(LogEvent):
-    parallel_id: int
-    requested_parallelism: Optional[int] = None
-
-@dataclass
-class WorkEvent(LogEvent):
-    parallel_id: Optional[int]
-    work_type: str
-    endpoint: str
-
-@dataclass
-class MutexAcquireEvent(LogEvent):
-    kind: str
-    wait_id: int
-
-@dataclass
-class MutexAcquiredEvent(LogEvent):
-    kind: str
-    wait_id: int
-
-@dataclass
-class MutexReleaseEvent(LogEvent):
-    kind: str
-    wait_id: int
-
-@dataclass
-class SyncRegionEvent(LogEvent):
-    parallel_id: Optional[int]
-    kind: str
-    endpoint: str
-
-@dataclass
-class SyncRegionWaitEvent(LogEvent):
-    parallel_id: Optional[int]
-    kind: str
-    endpoint: str
-
-@dataclass
-class TaskCreateEvent(LogEvent):
-    task_number: int
-    parent_task_number: int
-
-@dataclass
-class TaskScheduleEvent(LogEvent):
-    prior_task_data: int
-    prior_task_status: str
-    next_task_data: Optional[int]
-
-@dataclass
-class ParallelEndEvent(LogEvent):
-    parallel_id: int
-
-# Same as diagram.py
-def parse_logs_for_thread_events(folder_name: str):
-    """ Parses text files in logs/ to return event objects for each log file (thread). """
-    log_files = [file for file in os.listdir(folder_name) if file.endswith(".txt")]
-    sorted_log_files = sorted(log_files)  # sorted by file name (i.e., thread number)
-    thread_num_to_events = {}
-    for i, file in enumerate(sorted_log_files):
-        with open(f"{folder_name}/{file}", "r") as f:
-            log_data = f.read()
-        parsed_events = parse_log(log_data, i)  # Pass thread_number
-        thread_num_to_events[i] = parsed_events
-    return thread_num_to_events
-
-# Same as diagram.py
-def extract_parallel_id(event: LogEvent):
-    """ try all events that potentially have parallel_id """
-    if isinstance(event, ParallelEvent):
-        return event.parallel_id
-    if isinstance(event, ParallelEndEvent):
-        return event.parallel_id
-    if isinstance(event, ImplicitTaskEvent):
-        return event.parallel_id
-    if isinstance(event, WorkEvent):
-        return event.parallel_id
-    if isinstance(event, SyncRegionEvent):
-        return event.parallel_id
-    if isinstance(event, SyncRegionWaitEvent):
-        return event.parallel_id
-    return None
-
-# Same as diagram.py
-def parse_log(lines: str, thread_number: int):
-    events = []
-    current_event = {}
-    for line in lines.strip().split("\n"):
-        line = line.strip()
-        if not line or line.startswith("--------------------------"):
-            if current_event:
-                
-                event = create_event(current_event, thread_number)
-                if event:
-                    events.append(event)
-                current_event = {}
-            continue
-        key, value = map(str.strip, line.split(": ", 1))
-        current_event[key.replace(" ", "_").lower()] = value
-    return events
-
-# Slightly modified
-def create_event(event_dict, thread_number: int):
-    time = int(event_dict["time"].split()[0])
-    event = event_dict["event"]
-    base_params = {
-        "time": time,
-        "event": event,
-        "thread_number": thread_number
-    }
-    if event == "Thread Create":
-        return ThreadCreateEvent(
-            **base_params,
-            thread_type=event_dict["thread_type"]
-        )
-    if event == "Implicit Task":
-        return ImplicitTaskEvent(
-            **base_params,
-            task_number=int(event_dict["task_number"]),
-            endpoint=event_dict["endpoint"],
-            parallel_id=int(event_dict["parallel_id"]) if event_dict.get("parallel_id", "N/A") != "N/A" else None
-        )
-    if event in ["Parallel Begin", "Parallel Start"]:
-        return ParallelEvent(
-            **base_params,
-            parallel_id=int(event_dict["parallel_id"]),
-            requested_parallelism=int(event_dict.get("requested_parallelism", 0)),
-        )
-    if event == "Parallel End":
-        return ParallelEndEvent(
-            **base_params,
-            parallel_id=int(event_dict["parallel_id"]),
-        )
-    if event == "Work":
-        return WorkEvent(
-            **base_params,
-            parallel_id=int(event_dict["parallel_id"]) if event_dict.get("parallel_id", "N/A") != "N/A" else None,
-            work_type=event_dict["work_type"],
-            endpoint=event_dict["endpoint"],
-        )
-    if event == "Mutex Acquire":
-        return MutexAcquireEvent(
-            **base_params,
-            kind=event_dict["kind"],
-            wait_id=int(event_dict["wait_id"]),
-        )
-    if event == "Mutex Acquired":
-        return MutexAcquiredEvent(
-            **base_params,
-            kind=event_dict["kind"],
-            wait_id=int(event_dict["wait_id"]),
-        )
-    if event == "Mutex Released":
-        return MutexReleaseEvent(
-            **base_params,
-            kind=event_dict["kind"],
-            wait_id=int(event_dict["wait_id"]),
-        )
-    if event == "Sync Region Wait":
-        return SyncRegionWaitEvent(
-            **base_params,
-            parallel_id=int(event_dict["parallel_id"]) if event_dict.get("parallel_id", "N/A") != "N/A" else None,
-            kind=event_dict["kind"],
-            endpoint=event_dict["endpoint"],
-        )
-    if event == "Sync Region":
-        return SyncRegionEvent(
-            **base_params,
-            parallel_id=int(event_dict["parallel_id"]) if event_dict.get("parallel_id", "N/A") != "N/A" else None,
-            kind=event_dict["kind"],
-            endpoint=event_dict["endpoint"],
-        )
-    if event == "Task Create":
-        return TaskCreateEvent(
-            **base_params,
-            task_number=int(event_dict["task_number"]),
-            parent_task_number=int(event_dict["parent_task_number"]),
-        )
-    if event == "Task Schedule":
-        return TaskScheduleEvent(
-            **base_params,
-            prior_task_data=int(event_dict["prior_task_data"]),
-            prior_task_status=event_dict["prior_task_status"],
-            next_task_data=int(event_dict["next_task_data"]) if event_dict.get("next_task_data", "N/A") != "N/A" else None
-        )
-    return LogEvent(time=time, event=event, thread_number=thread_number)
 
 def get_time_spent_by_section(thread_num_to_events: dict):
     """ 
@@ -240,7 +29,6 @@ def get_time_spent_by_section(thread_num_to_events: dict):
     }
     """
     sections = defaultdict(lambda : defaultdict(lambda : defaultdict(int)))
-    section_keys = ["Working", "Critical", "Lock", "Implicit Barrier", "Barrier", "Other"]
 
     # Only get parallel ids that are disjoint. Assume that all disjoint parallel regions are started by thread 0.
     parallel_ids = set()
@@ -400,6 +188,7 @@ def get_time_spent_by_task(thread_num_to_events: dict):
             first_event, last_event = parallel_id_to_thread_to_boundary_events[parallel_id][thread]
             events = thread_num_to_events[thread]
             stack = []
+            prev_custom_callback = None
 
             for event in events:
                 if not (first_event.time <= event.time <= last_event.time):
@@ -410,16 +199,22 @@ def get_time_spent_by_task(thread_num_to_events: dict):
                     prev_event = stack.pop()
                     assert((isinstance(prev_event, ImplicitTaskEvent) and prev_event.task_number == event.task_number) \
                         or (isinstance(prev_event, TaskScheduleEvent) and prev_event.next_task_data == event.task_number))
-                    sections[parallel_id][thread]["Task " + str(event.task_number)] += event.time - prev_event.time
+                    sections[str(parallel_id)][thread]["Task " + str(event.task_number)] += event.time - prev_event.time
                 elif isinstance(event, TaskScheduleEvent):
                     # Task Schedule Event is essentially an end TaskEvent and then a start TaskEvent
                     prev_event = stack.pop()
                         
                     assert((isinstance(prev_event, ImplicitTaskEvent) and prev_event.task_number == event.prior_task_data) \
                         or (isinstance(prev_event, TaskScheduleEvent) and prev_event.next_task_data == event.prior_task_data))
-                    sections[parallel_id][thread]["Task " + str(event.prior_task_data)] += event.time - prev_event.time
+                    sections[str(parallel_id)][thread]["Task " + str(event.prior_task_data)] += event.time - prev_event.time
                     
                     stack.append(event)
+                elif event.event == "Custom Callback Begin":
+                    prev_custom_callback = event
+                elif event.event == "Custom Callback End":
+                    assert(prev_custom_callback != None)
+                    sections["Custom Callback"][thread]["Custom Callback"] += event.time - prev_custom_callback.time
+                    prev_custom_callback = None
 
     # Add global view of parallel sections
     thread_to_total_time = {}
@@ -436,6 +231,7 @@ def get_time_spent_by_task(thread_num_to_events: dict):
     
     for thread in thread_to_total_time:
         sections["Global"][thread]["Non Parallel Work"] = thread_to_total_time[thread] - sum(sections["Global"][thread].values())
+        sections["Custom Callback"][thread]["Non Custom Callback Work"] = thread_to_total_time[thread] - sum(sections["Custom Callback"][thread].values())
 
     return sections
                     
@@ -454,7 +250,7 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
     section_colors = {section: color_scale[i % len(color_scale)] for i, section in enumerate(sorted(sections))}
 
     num_sections = len(parallel_sections_data)
-    subplot_titles = list(parallel_sections_data.keys())
+    subplot_titles = sorted(list(parallel_sections_data.keys()))
 
     # Create subplots with a variable number of columns
     fig = make_subplots(rows=1, cols=num_sections, subplot_titles=subplot_titles)
@@ -462,7 +258,7 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
     # Sort sections for consistent legend order
     sorted_sections = sorted(sections, key=lambda x: (len(str(x)), str(x)))
 
-    for pos, (parallel_id, thread_data) in enumerate(parallel_sections_data.items()):
+    for pos, (parallel_id, thread_data) in enumerate(sorted(parallel_sections_data.items())):
         # Extract thread names
         threads = list(thread_data.keys())
 

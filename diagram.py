@@ -159,7 +159,7 @@ def parse_log(lines: str, thread_number: int):
 # Slightly modified
 def create_event(event_dict, thread_number: int):
     """ Create an event object from a dictionary extracted from a log file. """
-    time = round(int(event_dict["time"].split()[0]) / 1000000, 3)
+    time = int(event_dict["time"].split()[0])
     event = event_dict["event"]
     base_params = {
         "time": time,
