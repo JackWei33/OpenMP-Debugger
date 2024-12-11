@@ -11,7 +11,6 @@
 #include <thread>
 
 ompt_function_lookup_t global_lookup = NULL;
-long long start_time;
 int global_task_number = 0;
 bool use_dl_detector = false;
 
@@ -34,7 +33,7 @@ void log_event(uint64_t thread_id, const std::string &event_type, const std::vec
     outFile.open(filename, std::ios::app);
 
     std::string log_message;
-    log_message += "Time: " + std::to_string(get_time_microsecond() - start_time) + " µs\n";
+    log_message += "Time: " + std::to_string(get_time_microsecond()) + " µs\n";
     log_message += "Event: " + event_type + "\n";
 
     for (const auto &detail : details) {
@@ -298,7 +297,6 @@ int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_
 {
     std::cout << "OMPT tool initialized.\n";
     global_lookup = lookup;
-    start_time = get_time_microsecond();
     auto register_callback = (ompt_set_callback_t)lookup("ompt_set_callback");
 
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)lookup("ompt_get_thread_data");
