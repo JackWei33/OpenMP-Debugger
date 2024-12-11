@@ -3,6 +3,9 @@
 #include <unordered_set>
 #include <string>
 #include <stdexcept>
+#include <fstream>
+#include <thread>
+#include <vector>
 #include "dl_detector.h"
 #include <omp-tools.h>
 #include <boost/lockfree/queue.hpp>
@@ -10,84 +13,123 @@
 enum EventType {
     ACQUIRE,
     ACQUIRED,
-    RELEASE
+    RELEASE,
+    BARRIER_BEGIN,
+    BARRIER_END
 };
 
-struct MutexEvent {
+enum BarrierState {
+    NOT_IN_USE,
+    IN_USE
+};
+
+struct SynchEvent {
     EventType type;
     ompt_mutex_t kind;
     ompt_wait_id_t wait_id;
     uint64_t thread_id;
 };
 
-boost::lockfree::queue<MutexEvent> event_queue{1024};
-std::mutex event_queue_mutex;
-std::condition_variable event_queue_cv;
-bool should_terminate = false;
+static boost::lockfree::queue<SynchEvent> event_queue{1024};
+std::atomic<bool> should_terminate{false};
 
 
 void process_mutex_acquire(ompt_mutex_t kind, ompt_wait_id_t wait_id, uint64_t thread_id) {
-    MutexEvent event{
+    SynchEvent event{
         .type = EventType::ACQUIRE,
         .kind = kind,
         .wait_id = wait_id,
         .thread_id = thread_id
     };
     
-    event_queue.push(event);
-    event_queue_cv.notify_one(); 
+    event_queue.push(event); 
 }
 
 void process_mutex_acquired(ompt_mutex_t kind, ompt_wait_id_t wait_id, uint64_t thread_id) {
-    MutexEvent event{
+    SynchEvent event{
         .type = EventType::ACQUIRED,
         .kind = kind,
         .wait_id = wait_id,
         .thread_id = thread_id
     };
     
-    event_queue.push(event);
-    event_queue_cv.notify_one(); 
+    event_queue.push(event); 
 }
 
 void process_mutex_released(ompt_mutex_t kind, ompt_wait_id_t wait_id, uint64_t thread_id) {
-    MutexEvent event{
+    SynchEvent event{
         .type = EventType::RELEASE,
         .kind = kind,
         .wait_id = wait_id,
         .thread_id = thread_id
     };
     
-    event_queue.push(event);
-    event_queue_cv.notify_one(); 
+    event_queue.push(event); 
+}
+
+void process_barrier(ompt_sync_region_t kind, ompt_scope_endpoint_t endpoint, uint64_t thread_id) {
+    if (kind == ompt_sync_region_barrier_explicit) {
+        SynchEvent event{
+            .type = endpoint == ompt_scope_begin ? EventType::BARRIER_BEGIN : EventType::BARRIER_END,
+            .thread_id = thread_id
+        };
+
+        event_queue.push(event);
+
+    }
+}
+
+void start_dl_detector_thread() {
+    std::thread(dl_detector_thread).detach(); // Assign new thread
+}
+
+void end_dl_detector_thread() {
+    should_terminate = true;
 }
 
 class DirectedGraph {
 private:
     std::unordered_map<std::string, std::unordered_set<std::string>> graph;
+    std::vector<std::string> currentCycle;
 
-    bool dfsCycleDetection(const std::string& node, std::unordered_set<std::string>& visited, std::unordered_set<std::string>& recursionStack) const {
+    bool dfsCycleDetection(const std::string& node, std::unordered_set<std::string>& visited, 
+                          std::unordered_set<std::string>& recursionStack, 
+                          std::vector<std::string>& cycle) {
         if (recursionStack.find(node) != recursionStack.end()) {
-            return true; // Cycle detected
+            // Found cycle, reconstruct it starting from this node
+            size_t start = 0;
+            for (size_t i = 0; i < cycle.size(); i++) {
+                if (cycle[i] == node) {
+                    start = i;
+                    break;
+                }
+            }
+            currentCycle.clear();
+            for (size_t i = start; i < cycle.size(); i++) {
+                currentCycle.push_back(cycle[i]);
+            }
+            currentCycle.push_back(node);
+            return true;
         }
 
         if (visited.find(node) != visited.end()) {
-            return false; // Already visited, no cycle found
+            return false;
         }
 
         visited.insert(node);
         recursionStack.insert(node);
+        cycle.push_back(node);
 
-        // Recurse for all neighbors
         if (graph.find(node) != graph.end()) {
             for (const auto& neighbor : graph.at(node)) {
-                if (dfsCycleDetection(neighbor, visited, recursionStack)) {
+                if (dfsCycleDetection(neighbor, visited, recursionStack, cycle)) {
                     return true;
                 }
             }
         }
 
         recursionStack.erase(node);
+        cycle.pop_back();
         return false;
     }
 
@@ -116,84 +158,196 @@ public:
     }
 
     // Display the graph (for debugging purposes)
-    void display() const {
+    void display(std::ofstream& outFile) const {
+        outFile << "=== Graph State ===" << std::endl;
         for (const auto& pair : graph) {
-            std::cout << pair.first << " -> { ";
+            outFile << pair.first << " -> { ";
+            bool first = true;
             for (const auto& neighbor : pair.second) {
-                std::cout << neighbor << " ";
+                if (!first) {
+                    outFile << ", ";
+                }
+                outFile << neighbor;
+                first = false;
             }
-            std::cout << "}\n";
+            outFile << " }" << std::endl;
         }
     }
 
-    bool hasCycle() const {
+
+    bool hasEdge(const std::string& fromNode, const std::string& toNode) const {
+        if (graph.find(fromNode) == graph.end() || graph.find(toNode) == graph.end()) {
+            return false;
+        }
+
+        const auto& neighbors = graph.at(fromNode);
+        return neighbors.find(toNode) != neighbors.end();
+    }
+
+    bool hasCycle() {
         std::unordered_set<std::string> visited;
         std::unordered_set<std::string> recursionStack;
+        std::vector<std::string> cycle;
+        currentCycle.clear();
 
         for (const auto& pair : graph) {
-            if (dfsCycleDetection(pair.first, visited, recursionStack)) {
+            if (dfsCycleDetection(pair.first, visited, recursionStack, cycle)) {
                 return true;
             }
         }
         return false;
+    }
+
+    void displayCycle(std::ofstream& outFile) const {
+        if (currentCycle.empty()) {
+            outFile << "No cycle detected" << std::endl;
+            return;
+        }
+
+        outFile << "=== Deadlock Cycle ===" << std::endl;
+        for (size_t i = 0; i < currentCycle.size(); i++) {
+            outFile << currentCycle[i];
+            if (i < currentCycle.size() - 1) {
+                outFile << " -> ";
+            }
+        }
+        outFile << std::endl;
     }
 };
 
 
 void dl_detector_thread() {
     DirectedGraph graph;
+    std::unordered_set<std::string> threads;
+    BarrierState barrierState = NOT_IN_USE;
+    std::string barrierName = "Barrier";
+    std::ofstream outFile("dl_detector_logs/graph_state.txt", std::ios::trunc);
+
+    graph.addNode(barrierName);
 
     while (true) {
-        MutexEvent event;
+        SynchEvent event;
 
-        {
-            std::unique_lock<std::mutex> lock(event_queue_mutex);
-
-            // Wait for an event or termination signal
-            event_queue_cv.wait(lock, []{ return !event_queue.empty() || should_terminate; });
-
-            // Exit if termination signal is received and the queue is empty
-            if (should_terminate && event_queue.empty()) {
-                break;
-            }
-
-            // Pop an event from the queue
-            if (!event_queue.pop(event)) {
-                continue;
-            }
+        while (event_queue.empty() && !should_terminate) {
         }
 
-        // Print event details
-        // std::cout << "New Event Detected:\n";
-        // std::cout << "  Thread ID: " << event.thread_id << "\n";
-        // std::cout << "  Wait ID: " << event.wait_id << "\n";
+        if (should_terminate && event_queue.empty()) {
+            break;
+        }
+
+        if (!event_queue.pop(event)) {
+            continue;
+        }
 
         std::string threadName = "Thread: " + std::to_string(event.thread_id);
         std::string mutexName = "Mutex: " + std::to_string(event.wait_id);
 
-        graph.addNode(threadName);
-        graph.addNode(mutexName);
+        if (event.kind == ompt_mutex_lock || event.kind == ompt_mutex_test_lock || event.kind == ompt_mutex_nest_lock || event.kind == ompt_mutex_test_nest_lock) {
+            mutexName = "Lock: " + std::to_string(event.wait_id);
+        } else if (event.kind == ompt_mutex_critical) {
+            mutexName = "Critical: " + std::to_string(event.wait_id);
+        }
         
+        if (threads.find(threadName) == threads.end()) {
+            threads.insert(threadName);
+        }
+
+        graph.addNode(threadName);
+        if (event.type == EventType::ACQUIRE || event.type == EventType::ACQUIRED || event.type == EventType::RELEASE) {
+            graph.addNode(mutexName);
+        }
+
         switch (event.type) {
-            case ACQUIRE:
-                graph.addEdge(threadName, mutexName);
+            case EventType::BARRIER_BEGIN:
+                switch (barrierState) {
+                    case BarrierState::NOT_IN_USE:
+                        for (const std::string elem : threads) {
+                            graph.addEdge(barrierName, elem);
+                        }
+                        barrierState = BarrierState::IN_USE;
+
+                        graph.removeEdge(barrierName, threadName);
+                        graph.addEdge(threadName, barrierName);
+                        break;
+                    case BarrierState::IN_USE:
+                        graph.removeEdge(barrierName, threadName);
+                        graph.addEdge(threadName, barrierName);
+                        break;
+                }
                 break;
 
-            case ACQUIRED:
-                graph.removeEdge(threadName, mutexName);
-                graph.addEdge(mutexName, threadName);
+            case EventType::BARRIER_END:
+                switch (barrierState) {
+                    case BarrierState::NOT_IN_USE:
+                        break;
+                    case BarrierState::IN_USE:
+                        for (const std::string elem : threads) {
+                            graph.removeEdge(barrierName, elem);
+                            graph.removeEdge(elem, barrierName);
+                        }
+                        barrierState = NOT_IN_USE;
+                        break;
+                }
                 break;
 
-            case RELEASE:
-                graph.removeEdge(mutexName, threadName);
+            case EventType::ACQUIRE:
+                switch (event.kind) {
+                    case ompt_mutex_lock:
+                    case ompt_mutex_critical:
+                        graph.addEdge(threadName, mutexName);
+                        break;
+                    case ompt_mutex_nest_lock:
+                        if (!graph.hasEdge(mutexName, threadName)) {
+                            graph.addEdge(threadName, mutexName);
+                        }
+                        break;
+                    case ompt_mutex_test_nest_lock:
+                    case ompt_mutex_test_lock:
+                    case ompt_mutex_atomic:
+                    case ompt_mutex_ordered:
+                        break;
+                }
+                break;
+
+            case EventType::ACQUIRED:
+                switch (event.kind) {
+                    case ompt_mutex_lock:
+                    case ompt_mutex_critical:
+                    case ompt_mutex_nest_lock:
+                    case ompt_mutex_test_nest_lock:
+                    case ompt_mutex_test_lock:
+                        graph.removeEdge(threadName, mutexName);
+                        graph.addEdge(mutexName, threadName);
+                        break;
+                    case ompt_mutex_atomic:
+                    case ompt_mutex_ordered:
+                        break;
+                }
+                break;
+                
+
+            case EventType::RELEASE:
+                switch (event.kind) {
+                    case ompt_mutex_lock:
+                    case ompt_mutex_critical:
+                    case ompt_mutex_nest_lock:
+                    case ompt_mutex_test_nest_lock:
+                    case ompt_mutex_test_lock:
+                        graph.removeEdge(mutexName, threadName);
+                        break;
+                    case ompt_mutex_atomic:
+                    case ompt_mutex_ordered:
+                        break;
+                }
                 break;
         }
+        
         if (graph.hasCycle()) {
             std::cout << "Deadlock Detected!\n";
-            graph.display();
+            graph.display(outFile);
+            graph.displayCycle(outFile);
             break;
         }
     }
-
     std::cout << "Deadlock Detector Thread Terminated\n";
 }

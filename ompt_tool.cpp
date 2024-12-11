@@ -13,6 +13,7 @@
 ompt_function_lookup_t global_lookup = NULL;
 long long start_time;
 int global_task_number = 0;
+bool use_dl_detector = false;
 
 long long get_time_microsecond() {
     auto now = std::chrono::system_clock::now();
@@ -215,7 +216,9 @@ void on_mutex_acquire(
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    process_mutex_acquire(kind, wait_id, thread_id);
+    if (use_dl_detector) {
+        process_mutex_acquire(kind, wait_id, thread_id);
+    }
 
     log_event(thread_id, "Mutex Acquire", {
         {"Kind", ompt_mutex_t_to_string(kind)},
@@ -235,7 +238,9 @@ void on_mutex_acquired(
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    process_mutex_acquired(kind, wait_id, thread_id);
+    if (use_dl_detector) {
+        process_mutex_acquired(kind, wait_id, thread_id);
+    }
 
     log_event(thread_id, "Mutex Acquired", {
         {"Kind", ompt_mutex_t_to_string(kind)},
@@ -255,7 +260,9 @@ void on_mutex_released(
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
 
-    process_mutex_released(kind, wait_id, thread_id);
+    if (use_dl_detector) {
+        process_mutex_released(kind, wait_id, thread_id);
+    }
 
     log_event(thread_id, "Mutex Released", {
         {"Kind", ompt_mutex_t_to_string(kind)},
@@ -282,6 +289,8 @@ void on_sync_region_wait(ompt_sync_region_t kind,
         {"Endpoint", ompt_scope_endpoint_t_to_string(endpoint)},
         {"Code Pointer Return Address", std::to_string(reinterpret_cast<uint64_t>(codeptr_ra))}
     });
+
+    process_barrier(kind, endpoint, thread_id);
 }
 
 // OMPT initialization
@@ -319,7 +328,9 @@ int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_
         std::cerr << "Failed to retrieve ompt_set_callback.\n";
     }
 
-    std::thread(dl_detector_thread).detach();
+    if (use_dl_detector) {
+        start_dl_detector_thread();
+    }
 
     return 1; // Successful initialization
 }
@@ -327,6 +338,10 @@ int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_
 // OMPT finalization
 void ompt_finalize(ompt_data_t *tool_data)
 {
+    if (use_dl_detector) {
+        end_dl_detector_thread();
+    }
+    
     std::cout << "OMPT tool finalized.\n";
 }
 
