@@ -103,12 +103,12 @@ int main()
 
     #pragma omp parallel num_threads(4)
     {
-        LIBRARY_BEGIN_TRACE();
+        LIBRARY_BEGIN_TRACE("Parallel for");
         #pragma omp for
         for (int i = 0; i < 5; i++) {
             // Your work here
         }
-        LIBRARY_END_TRACE();
+        LIBRARY_END_TRACE("Parallel for");
     }
 
     // /* Example 5: Taskloop */
