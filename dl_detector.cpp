@@ -218,9 +218,10 @@ public:
 
 void dl_detector_thread() {
     DirectedGraph graph;
-    std::unordered_set<std::string> threads;
+    std::unordered_map<std::string, int> threads_to_iteration;
     BarrierState barrierState = NOT_IN_USE;
     std::string barrierName = "Barrier";
+    int barrier_iteration = 0;
     std::ofstream outFile("dl_detector_logs/graph_state.txt", std::ios::trunc);
 
     graph.addNode(barrierName);
@@ -248,8 +249,8 @@ void dl_detector_thread() {
             mutexName = "Critical: " + std::to_string(event.wait_id);
         }
         
-        if (threads.find(threadName) == threads.end()) {
-            threads.insert(threadName);
+        if (threads_to_iteration.find(threadName) == threads_to_iteration.end()) {
+            threads_to_iteration[threadName] = 0;
         }
 
         graph.addNode(threadName);
@@ -261,8 +262,8 @@ void dl_detector_thread() {
             case EventType::BARRIER_BEGIN:
                 switch (barrierState) {
                     case BarrierState::NOT_IN_USE:
-                        for (const std::string elem : threads) {
-                            graph.addEdge(barrierName, elem);
+                        for (const auto& pair : threads_to_iteration) {
+                            graph.addEdge(barrierName, pair.first);
                         }
                         barrierState = BarrierState::IN_USE;
 
@@ -279,13 +280,19 @@ void dl_detector_thread() {
             case EventType::BARRIER_END:
                 switch (barrierState) {
                     case BarrierState::NOT_IN_USE:
+                        threads_to_iteration[threadName]++;
                         break;
                     case BarrierState::IN_USE:
-                        for (const std::string elem : threads) {
-                            graph.removeEdge(barrierName, elem);
-                            graph.removeEdge(elem, barrierName);
+                        if (threads_to_iteration[threadName] == barrier_iteration) {
+                            for (const auto& pair : threads_to_iteration) {
+                                graph.removeEdge(barrierName, pair.first);
+                                graph.removeEdge(pair.first, barrierName);
+                            }
+                            barrierState = NOT_IN_USE;
+                            barrier_iteration++;
                         }
-                        barrierState = NOT_IN_USE;
+                        
+                        threads_to_iteration[threadName]++;
                         break;
                 }
                 break;
@@ -348,6 +355,7 @@ void dl_detector_thread() {
             graph.displayCycle(outFile);
             break;
         }
+        graph.display(outFile);
     }
     std::cout << "Deadlock Detector Thread Terminated\n";
 }
