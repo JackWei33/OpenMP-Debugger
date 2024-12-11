@@ -21,6 +21,13 @@ class ThreadCreateEvent(LogEvent):
     thread_type: str
 
 @dataclass
+class CustomEventStart(LogEvent):
+    name: str
+
+@dataclass
+class CustomEventEnd(LogEvent):
+    name: str
+@dataclass
 class ImplicitTaskEvent(LogEvent):
     task_number: int
     endpoint: str
@@ -241,6 +248,16 @@ def create_event(event_dict, thread_number: int):
             prior_task_status=event_dict["prior_task_status"],
             next_task_data=int(event_dict["next_task_data"]) if event_dict.get("next_task_data", "N/A") != "N/A" else None
         )
+    if event == "Custom Callback Begin":
+        return CustomEventStart(
+            **base_params,
+            name=event_dict["name"]
+        )
+    if event == "Custom Callback End":
+        return CustomEventEnd(
+            **base_params,
+            name=event_dict["name"]
+        )
     return LogEvent(time=time, event=event, thread_number=thread_number)
 
 def generate_dag(thread_num_to_events: Dict[int, List[LogEvent]]):
@@ -309,13 +326,19 @@ def generate_dag(thread_num_to_events: Dict[int, List[LogEvent]]):
     parallel_id_to_end_node: Dict[int, GraphNode] = {}
     mutex_wait_id_to_nodes: Dict[int, Dict[str, GraphNode]] = {}
 
+    # Find minimum time
+    min_time = min(event.time for events in thread_num_to_events.values() for event in events)
+
     # Step 1: Transform all events into nodes and create temporal edges
     for thread_number, events in thread_num_to_events.items():
         events.sort(key=lambda e: e.time)
         prev_node: Optional[GraphNode] = None
         for event in events:
+            event.time = event.time - min_time
             if isinstance(event, SyncRegionWaitEvent):
                 # skip sync region wait events
+                continue
+            if isinstance(event, SyncRegionEvent) and ('implicit' in event.kind or 'taskgroup' in event.kind):
                 continue
             node = GraphNode(event=event)
             event_nodes[event.unique_id] = node
@@ -439,6 +462,10 @@ def get_shape(node: GraphNode):
         shape = 'Mcircle'
     elif isinstance(node.event, WorkEvent) and node.event.endpoint == 'ompt_scope_end':
         shape = 'circle'
+    elif isinstance(node.event, CustomEventStart):
+        shape = 'Mcircle'
+    elif isinstance(node.event, CustomEventEnd):
+        shape = 'circle'
     else:
         shape = 'box'
     return shape
@@ -450,6 +477,8 @@ def get_label(node: GraphNode):
             name += ' Begin'
         elif node.event.endpoint == 'ompt_scope_end':
             name += ' End'
+        if isinstance(node.event, WorkEvent):
+            name += f'\n({node.event.work_type})'
     elif isinstance(node.event, TaskCreateEvent):
         name += f' ({node.event.task_number})'
     elif isinstance(node.event, TaskScheduleEvent):
@@ -457,6 +486,11 @@ def get_label(node: GraphNode):
             name += f' ({node.event.next_task_data})'
         elif node.event.prior_task_status == 'ompt_task_complete':
             name += f' ({node.event.prior_task_data})'
+    elif isinstance(node.event, SyncRegionEvent) or isinstance(node.event, SyncRegionWaitEvent):
+        if 'implicit' in node.event.kind or 'taskgroup' in node.event.kind:
+            name += f'\n(implicit)'
+        else:
+            name += f'\n(explicit)'
     # elif isinstance(node.event, MutexAcquireEvent) or isinstance(node.event, MutexAcquiredEvent) or isinstance(node.event, MutexReleaseEvent):
         # name += f' ({node.event.wait_id})'
     return f"{name}\nThread: {node.event.thread_number}\nTime: {node.event.time}"
@@ -465,17 +499,25 @@ def get_color(node: GraphNode):
     if isinstance(node.event, MutexAcquireEvent) or isinstance(node.event, MutexAcquiredEvent) or isinstance(node.event, MutexReleaseEvent):
         return 'red'
     elif isinstance(node.event, SyncRegionEvent) or isinstance(node.event, SyncRegionWaitEvent):
-        return 'orange'
+        if 'implicit' in node.event.kind or 'taskgroup' in node.event.kind:
+            return 'gray'
+        else:
+            return 'orange'
     elif isinstance(node.event, TaskCreateEvent) or isinstance(node.event, TaskScheduleEvent):
         return 'green'
     elif isinstance(node.event, WorkEvent):
-        return 'blue'
+        if node.event.work_type == 'ompt_work_single_other':
+            return 'gray'
+        else:
+            return 'blue'
     elif isinstance(node.event, ThreadCreateEvent):
         return 'purple'
     elif isinstance(node.event, ImplicitTaskEvent):
         return 'pink'
     elif isinstance(node.event, ParallelEvent) or isinstance(node.event, ParallelEndEvent):
         return 'pink'
+    elif isinstance(node.event, CustomEventStart) or isinstance(node.event, CustomEventEnd):
+        return 'yellow'
     else:
         return 'black'
 
