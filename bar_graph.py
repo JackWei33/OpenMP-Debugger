@@ -11,6 +11,12 @@ from collections import defaultdict
 from diagram import *
 
 
+def convert_from_micro_to_milli(d: dict):
+    for key1 in d:
+        for key2 in d[key1]:
+            for key3 in d[key1][key2]:
+                d[key1][key2][key3] = round(d[key1][key2][key3] / 1000, 3)
+
 def get_time_spent_by_section(thread_num_to_events: dict):
     """ 
     Calculates the time spent synchronizing by each thread in different sections within each parallel section.
@@ -91,14 +97,14 @@ def get_time_spent_by_section(thread_num_to_events: dict):
                     prev_event = event
                 elif isinstance(event, MutexAcquiredEvent) and event.kind == "ompt_mutex_critical":
                     assert(isinstance(prev_event, MutexAcquireEvent) and prev_event.kind == "ompt_mutex_critical")
-                    sections[parallel_id][thread]["Critical"] += event.time - prev_event.time
+                    sections[f"Parallel id: {parallel_id}"][thread]["Critical"] += event.time - prev_event.time
                     prev_event = None
                 elif isinstance(event, MutexAcquireEvent) and event.kind == "ompt_mutex_lock":
                     assert(prev_event == None)
                     prev_event = event
                 elif isinstance(event, MutexAcquiredEvent) and event.kind == "ompt_mutex_lock":
                     assert(isinstance(prev_event, MutexAcquireEvent) and prev_event.kind == "ompt_mutex_lock")
-                    sections[parallel_id][thread]["Lock"] += event.time - prev_event.time
+                    sections[f"Parallel id: {parallel_id}"][thread]["Lock"] += event.time - prev_event.time
                     prev_event = None
                 elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_begin" \
                         and (event.kind == "ompt_sync_region_barrier_implicit_parallel" or event.kind == "ompt_sync_region_barrier_implicit_workshare" or event.kind == "ompt_sync_region_barrier_implicit"):
@@ -107,7 +113,7 @@ def get_time_spent_by_section(thread_num_to_events: dict):
                 elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_end" \
                         and (event.kind == "ompt_sync_region_barrier_implicit_parallel" or event.kind == "ompt_sync_region_barrier_implicit_workshare" or event.kind == "ompt_sync_region_barrier_implicit"):
                     assert(isinstance(prev_event, SyncRegionWaitEvent) and prev_event.endpoint == "ompt_scope_begin")
-                    sections[parallel_id][thread]["Implicit Barrier"] += event.time - prev_event.time
+                    sections[f"Parallel id: {parallel_id}"][thread]["Implicit Barrier"] += event.time - prev_event.time
                     prev_event = None
                 elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_begin" \
                         and event.kind == "ompt_sync_region_barrier_explicit":
@@ -116,13 +122,13 @@ def get_time_spent_by_section(thread_num_to_events: dict):
                 elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_end" \
                         and event.kind == "ompt_sync_region_barrier_explicit":
                     assert(isinstance(prev_event, SyncRegionWaitEvent) and prev_event.endpoint == "ompt_scope_begin")
-                    sections[parallel_id][thread]["Barrier"] += event.time - prev_event.time
+                    sections[f"Parallel id: {parallel_id}"][thread]["Barrier"] += event.time - prev_event.time
                     prev_event = None
                     
             # Fill in work
             total_time = parallel_id_to_thread_to_total_time[parallel_id][thread]
-            spent_time = sum(sections[parallel_id][thread].values())
-            sections[parallel_id][thread]["Working"] = total_time - spent_time
+            spent_time = sum(sections[f"Parallel id: {parallel_id}"][thread].values())
+            sections[f"Parallel id: {parallel_id}"][thread]["Working"] = total_time - spent_time
     
     return sections
 
@@ -188,7 +194,7 @@ def get_time_spent_by_task(thread_num_to_events: dict):
             first_event, last_event = parallel_id_to_thread_to_boundary_events[parallel_id][thread]
             events = thread_num_to_events[thread]
             stack = []
-            prev_custom_callback = None
+            prev_custom_callback = {}
 
             for event in events:
                 if not (first_event.time <= event.time <= last_event.time):
@@ -199,22 +205,22 @@ def get_time_spent_by_task(thread_num_to_events: dict):
                     prev_event = stack.pop()
                     assert((isinstance(prev_event, ImplicitTaskEvent) and prev_event.task_number == event.task_number) \
                         or (isinstance(prev_event, TaskScheduleEvent) and prev_event.next_task_data == event.task_number))
-                    sections[str(parallel_id)][thread]["Task " + str(event.task_number)] += event.time - prev_event.time
+                    sections[f"Parallel id: {parallel_id}"][thread]["Task " + str(event.task_number)] += event.time - prev_event.time
                 elif isinstance(event, TaskScheduleEvent):
                     # Task Schedule Event is essentially an end TaskEvent and then a start TaskEvent
                     prev_event = stack.pop()
                         
                     assert((isinstance(prev_event, ImplicitTaskEvent) and prev_event.task_number == event.prior_task_data) \
                         or (isinstance(prev_event, TaskScheduleEvent) and prev_event.next_task_data == event.prior_task_data))
-                    sections[str(parallel_id)][thread]["Task " + str(event.prior_task_data)] += event.time - prev_event.time
+                    sections[f"Parallel id: {parallel_id}"][thread]["Task " + str(event.prior_task_data)] += event.time - prev_event.time
                     
                     stack.append(event)
-                elif event.event == "Custom Callback Begin":
-                    prev_custom_callback = event
-                elif event.event == "Custom Callback End":
-                    assert(prev_custom_callback != None)
-                    sections["Custom Callback"][thread]["Custom Callback"] += event.time - prev_custom_callback.time
-                    prev_custom_callback = None
+                elif isinstance(event, CustomEventStart):
+                    prev_custom_callback[event.name] = event
+                elif isinstance(event, CustomEventEnd):
+                    assert(prev_custom_callback[event.name])
+                    sections["Custom Callback"][thread][f"Custom Callback: {event.name}"] += event.time - prev_custom_callback[event.name].time
+                    
 
     # Add global view of parallel sections
     thread_to_total_time = {}
@@ -231,7 +237,6 @@ def get_time_spent_by_task(thread_num_to_events: dict):
     
     for thread in thread_to_total_time:
         sections["Global"][thread]["Non Parallel Work"] = thread_to_total_time[thread] - sum(sections["Global"][thread].values())
-        sections["Custom Callback"][thread]["Non Custom Callback Work"] = thread_to_total_time[thread] - sum(sections["Custom Callback"][thread].values())
 
     return sections
                     
@@ -288,7 +293,7 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
         barmode='stack',
         title='Time Spent by Threads in Different Sections in Parallel Regions',
         xaxis_title='Threads',
-        yaxis_title='Time Spent',
+        yaxis_title='Time Spent (ms)',
         legend_title='Sections'
     )
 
@@ -300,6 +305,7 @@ def make_synchronization_bar_chart():
     log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     parallel_sections_data = get_time_spent_by_section(thread_num_to_events)
+    convert_from_micro_to_milli(parallel_sections_data)
 
     sections = set(['Working', 'Critical', 'Lock', 'Implicit Barrier', 'Barrier', 'Other'])
 
@@ -309,6 +315,7 @@ def make_task_bar_chart():
     log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     parallel_sections_data = get_time_spent_by_task(thread_num_to_events)
+    convert_from_micro_to_milli(parallel_sections_data)
 
     sections = set()
     for parallel_id in parallel_sections_data:

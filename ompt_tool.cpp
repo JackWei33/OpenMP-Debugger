@@ -12,6 +12,7 @@
 
 ompt_function_lookup_t global_lookup = NULL;
 int global_task_number = 0;
+int parallel_id_number = 1;
 bool use_dl_detector = false;
 
 long long get_time_microsecond() {
@@ -51,12 +52,10 @@ void on_parallel_begin(ompt_data_t *task_data, const ompt_frame_t *task_frame,
                        ompt_data_t *parallel_data, uint32_t requested_parallelism,
                        int flags, const void *codeptr_ra) {
     ompt_get_thread_data_t ompt_get_thread_data = (ompt_get_thread_data_t)global_lookup("ompt_get_thread_data");
-    ompt_get_unique_id_t ompt_get_unique_id = (ompt_get_unique_id_t)global_lookup("ompt_get_unique_id");
-
-    if (ompt_get_unique_id) {
-        uint64_t unique_id = ompt_get_unique_id();
-        parallel_data->value = unique_id;
-    }
+        
+    parallel_data->value = parallel_id_number;
+    #pragma omp atomic
+    parallel_id_number++;
 
     ompt_data_t *thread_data = ompt_get_thread_data();
     uint64_t thread_id = thread_data->value;
