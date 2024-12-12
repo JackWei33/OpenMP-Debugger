@@ -7,3 +7,6 @@ libompt_tool.so
 libompt_tool.dylib
 
 timeline.png
+
+# python
+__pycache__/
