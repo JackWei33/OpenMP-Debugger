@@ -124,6 +124,24 @@ def get_time_spent_by_section(thread_num_to_events: dict):
                     assert(isinstance(prev_event, SyncRegionWaitEvent) and prev_event.endpoint == "ompt_scope_begin")
                     sections[f"Parallel id: {parallel_id}"][thread]["Barrier"] += event.time - prev_event.time
                     prev_event = None
+                elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_begin" \
+                        and (event.kind == "ompt_sync_region_taskgroup"):
+                    assert(prev_event == None)
+                    prev_event = event
+                elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_end" \
+                        and (event.kind == "ompt_sync_region_taskgroup"):
+                    assert(isinstance(prev_event, SyncRegionWaitEvent) and prev_event.endpoint == "ompt_scope_begin")
+                    sections[f"Parallel id: {parallel_id}"][thread]["Task Group"] += event.time - prev_event.time
+                    prev_event = None
+                elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_begin" \
+                        and event.kind == "ompt_sync_region_taskwait":
+                    assert(prev_event == None)
+                    prev_event = event
+                elif isinstance(event, SyncRegionWaitEvent) and event.endpoint == "ompt_scope_end" \
+                        and event.kind == "ompt_sync_region_taskwait":
+                    assert(isinstance(prev_event, SyncRegionWaitEvent) and prev_event.endpoint == "ompt_scope_begin")
+                    sections[f"Parallel id: {parallel_id}"][thread]["Task Wait"] += event.time - prev_event.time
+                    prev_event = None
                     
             # Fill in work
             total_time = parallel_id_to_thread_to_total_time[parallel_id][thread]
@@ -307,7 +325,7 @@ def make_synchronization_bar_chart():
     parallel_sections_data = get_time_spent_by_section(thread_num_to_events)
     convert_from_micro_to_milli(parallel_sections_data)
 
-    sections = set(['Working', 'Critical', 'Lock', 'Implicit Barrier', 'Barrier', 'Other'])
+    sections = set(['Working', 'Critical', 'Lock', 'Implicit Barrier', 'Barrier', 'Other', 'Task Group', 'Task Wait'])
 
     create_stacked_bar_chart(parallel_sections_data, sections)
 
