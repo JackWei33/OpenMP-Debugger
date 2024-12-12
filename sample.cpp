@@ -218,17 +218,17 @@ int main()
     //     compass_trace_end("Parallel for");
     // }
 
-#pragma omp parallel
-{
-    #pragma omp single nowait
-    #pragma omp taskloop nogroup
-    for (int j=0; j<4; j++) {
-        // do work
-        compass_trace_begin("Taskloop");
-        // do other work
-        compass_trace_end("Taskloop");
-    }
-}
+// #pragma omp parallel
+// {
+//     #pragma omp single nowait
+//     #pragma omp taskloop nogroup
+//     for (int j=0; j<4; j++) {
+//         // do work
+//         compass_trace_begin("Taskloop");
+//         // do other work
+//         compass_trace_end("Taskloop");
+//     }
+// }
 
     // // /* Example 5: Taskloop */
     // #pragma omp parallel num_threads(4)
