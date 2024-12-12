@@ -56,13 +56,13 @@ inline void log_event(uint64_t thread_id, const std::string &event_type,
 }
 
 // Macros for beginning and ending a trace section with a callback name
-#define LIBRARY_BEGIN_TRACE(name) do { \
+#define compass_trace_begin(name) do { \
     uint64_t tid = static_cast<uint64_t>(omp_get_thread_num()); \
     std::vector<std::pair<std::string, std::string>> details = { {"Name", name} }; \
     log_event(tid, "Custom Callback Begin", details); \
 } while(0)
 
-#define LIBRARY_END_TRACE(name) do { \
+#define compass_trace_end(name) do { \
     uint64_t tid = static_cast<uint64_t>(omp_get_thread_num()); \
     std::vector<std::pair<std::string, std::string>> details = { {"Name", name} }; \
     log_event(tid, "Custom Callback End", details); \

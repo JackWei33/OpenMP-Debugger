@@ -453,19 +453,28 @@ def get_shape(node: GraphNode):
     elif isinstance(node.event, TaskScheduleEvent) and node.event.prior_task_status == 'ompt_task_complete':
         shape = 'triangle'
     elif isinstance(node.event, MutexAcquireEvent):
-        shape = 'rectangle'
+        # shape = 'rectangle'
+        shape = 'parallelogram'
     elif isinstance(node.event, MutexAcquiredEvent):
         shape = 'invhouse'
     elif isinstance(node.event, MutexReleaseEvent):
         shape = 'house'
     elif isinstance(node.event, WorkEvent) and node.event.endpoint == 'ompt_scope_begin':
-        shape = 'Mcircle'
+        # shape = 'Mcircle'
+        # shape = 'parallelogram'
+        shape = 'rectangle'
     elif isinstance(node.event, WorkEvent) and node.event.endpoint == 'ompt_scope_end':
-        shape = 'circle'
+        # shape = 'circle'
+        # shape = 'parallelogram'
+        shape = 'rectangle'
     elif isinstance(node.event, CustomEventStart):
-        shape = 'Mcircle'
+        # shape = 'Mcircle'
+        # shape = 'parallelogram'
+        shape = 'rectangle'
     elif isinstance(node.event, CustomEventEnd):
-        shape = 'circle'
+        # shape = 'circle'
+        # shape = 'parallelogram'
+        shape = 'rectangle'
     else:
         shape = 'box'
     return shape
@@ -509,7 +518,7 @@ def get_color(node: GraphNode):
         if node.event.work_type == 'ompt_work_single_other':
             return 'gray'
         else:
-            return 'blue'
+            return 'lightblue'
     elif isinstance(node.event, ThreadCreateEvent):
         return 'purple'
     elif isinstance(node.event, ImplicitTaskEvent):
@@ -595,7 +604,9 @@ def create_graphviz_graph(graph_nodes: List[GraphNode], output_file: str, style:
                 style, penwidth, color = get_edge_attributes(edge_type)
                 c.edge(node.event.unique_id, child_node.event.unique_id, style=style, color=color, penwidth=penwidth)
                 
-        for node in graph_nodes:
+        sorted_graph_nodes = sorted(graph_nodes, key=lambda n: n.event.time)
+        
+        for node in sorted_graph_nodes:
             label = get_label(node)
             shape = get_shape(node)
             color = get_color(node)
