@@ -1,0 +1,131 @@
+Running batch operations
+Running wireroute with ALGO_TYPE=W and NUM_THREADS=1
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0154053070
+Computation time (sec): 13.5249601670
+Max occupancy: 3
+Total cost: 1034288
+4096 4096 1123
+2024-10-16 21:07:25,626 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=W and NUM_THREADS=2
+Number of threads: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0152391080
+Computation time (sec): 6.7781724410
+Max occupancy: 3
+Total cost: 1035320
+4096 4096 1123
+2024-10-16 21:07:33,435 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=W and NUM_THREADS=4
+Number of threads: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0153248120
+Computation time (sec): 3.4917909600
+Max occupancy: 3
+Total cost: 1034164
+4096 4096 1123
+2024-10-16 21:07:37,979 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=W and NUM_THREADS=8
+Number of threads: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0153538000
+Computation time (sec): 1.8580355510
+Max occupancy: 3
+Total cost: 1036306
+4096 4096 1123
+2024-10-16 21:07:40,874 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=W and NUM_THREADS=16
+Number of threads: 16
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: W
+Batch size: 1
+Initialization time (sec): 0.0153084680
+Computation time (sec): 2.0106357490
+Max occupancy: 3
+Total cost: 1035006
+4096 4096 1123
+2024-10-16 21:07:43,934 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=A and NUM_THREADS=1
+Number of threads: 1
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.0152875070
+Computation time (sec): 13.6346321480
+Max occupancy: 4
+Total cost: 1037860
+4096 4096 1123
+2024-10-16 21:07:58,604 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=A and NUM_THREADS=2
+Number of threads: 2
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.0154089480
+Computation time (sec): 6.9799269530
+Max occupancy: 3
+Total cost: 1034440
+4096 4096 1123
+2024-10-16 21:08:06,618 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=A and NUM_THREADS=4
+Number of threads: 4
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.0154784160
+Computation time (sec): 3.5052638980
+Max occupancy: 3
+Total cost: 1041436
+4096 4096 1123
+2024-10-16 21:08:11,158 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=A and NUM_THREADS=8
+Number of threads: 8
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.0156715690
+Computation time (sec): 1.8419927540
+Max occupancy: 4
+Total cost: 1056724
+4096 4096 1123
+2024-10-16 21:08:14,044 - INFO -   validate:84    - Cost Array constructed
+Running wireroute with ALGO_TYPE=A and NUM_THREADS=16
+Number of threads: 16
+Simulated annealing probability parameter: 0.1
+Simulated annealing iterations: 5
+Input file: inputs/timeinput/hard_4096.txt
+Parallel mode: A
+Batch size: 1
+Initialization time (sec): 0.0156781500
+Computation time (sec): 1.8456268310
+Max occupancy: 3
+Total cost: 1049592
+4096 4096 1123
+2024-10-16 21:08:16,941 - INFO -   validate:84    - Cost Array constructed

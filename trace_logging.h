@@ -8,6 +8,19 @@
 #include <utility>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
+
+std::string extract_until(const std::string& path, const std::string& target) {
+    size_t pos = path.find(target); // Find the target in the string
+    if (pos == std::string::npos) {
+        throw std::runtime_error("Target not found in path");
+    }
+    size_t lastSlash = path.rfind('/', pos - 1); // Find the last '/' before the target
+    return path.substr(0, lastSlash + 1);       // Extract up to that '/'
+}
+
+std::filesystem::path currentPath = std::filesystem::current_path();
+std::string pathToFolder = extract_until(currentPath.string(), "OpenMP-Debugger") + "OpenMP-Debugger/";
 
 // Function to get the current time in microseconds
 inline long long get_time_microsecond() {
@@ -21,9 +34,8 @@ inline long long get_time_microsecond() {
 inline void log_event(uint64_t thread_id, const std::string &event_type,
                       const std::vector<std::pair<std::string, std::string>> &details) {
     std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
+    std::string filename = pathToFolder + "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
     outFile.open(filename, std::ios::app);
-
     if (!outFile.is_open()) {
         // Handle error (optional)
         return;

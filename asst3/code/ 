@@ -1,0 +1,42 @@
+Time: 1734036533898989 µs
+Event: Sync Region Wait
+Parallel ID: N/A
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code Pointer Return Address: 0
+--------------------------
+Time: 1734036533899062 µs
+Event: Sync Region
+Parallel ID: N/A
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code Pointer Return Address: 0
+--------------------------
+Time: 1734036533899314 µs
+Event: Sync Region Wait
+Parallel ID: N/A
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code Pointer Return Address: 0
+--------------------------
+Time: 1734036533899338 µs
+Event: Sync Region
+Parallel ID: N/A
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code Pointer Return Address: 0
+--------------------------
+Time: 1734036533899476 µs
+Event: Sync Region Wait
+Parallel ID: N/A
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code Pointer Return Address: 0
+--------------------------
+Time: 1734036533899498 µs
+Event: Sync Region
+Parallel ID: N/A
+Kind: ompt_sync_region_barrier_implicit_parallel
+Endpoint: ompt_scope_end
+Code Pointer Return Address: 0
+--------------------------

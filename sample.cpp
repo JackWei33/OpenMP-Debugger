@@ -112,6 +112,7 @@ int main()
     // }
 
     /* Example 5: Taskloop */
+    LIBRARY_BEGIN_TRACE("hi");
     #pragma omp parallel num_threads(4)
     {
         #pragma omp single
@@ -124,6 +125,7 @@ int main()
             }
         }
     }
+    LIBRARY_END_TRACE("hi");
 
     // // /* Example 6: Barrier and critical */
     // omp_lock_t lock;
