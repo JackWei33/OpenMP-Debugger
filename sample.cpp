@@ -3,7 +3,10 @@
 #include <vector>
 #include <thread> // For std::this_thread::sleep_for
 #include <chrono> // For std::chrono::microseconds
-#include "trace_logging.h"
+// #include "trace_logging.h"
+
+// #include <spdlog/spdlog.h>
+// #include <spdlog/async.h> // Support for asynchronous logging
 
 void my_func(int& sum, omp_lock_t& lock) {
     // Use lock to update sum
@@ -23,9 +26,28 @@ int fib(int n) {
     return i + j;
 }
 
+
+// // Initialize spdlog
+// constexpr size_t async_queue_size = 1048576; // 1 million items
+// constexpr size_t async_thread_count = 1;      // Number of worker threads
+
+// void initialize_spdlog()
+// {
+//     spdlog::init_thread_pool(async_queue_size, async_thread_count);
+//     // No need to initialize logger_map_mutex
+// }
+
+
+// void shutdown_spdlog()
+// {
+//     spdlog::shutdown();
+// }
+
+
 int main()
 {
-    long long start_time = get_time_microsecond();
+    // initialize_spdlog();
+    // long long start_time = get_time_microsecond();
     int sum = 0;
 
     std::cout << "Thread: " << omp_get_thread_num() << std::endl;
@@ -112,15 +134,15 @@ int main()
     //     }
     // }
 
-    #pragma omp parallel num_threads(4)
-    {
-        compass_trace_begin("Parallel for");
-        #pragma omp for
-        for (int i = 0; i < 5; i++) {
-            // Your work here
-        }
-        compass_trace_end("Parallel for");
-    }
+    // #pragma omp parallel num_threads(4)
+    // {
+    //     compass_trace_begin("Parallel for");
+    //     #pragma omp for
+    //     for (int i = 0; i < 5; i++) {
+    //         // Your work here
+    //     }
+    //     compass_trace_end("Parallel for");
+    // }
 
     /* Example 5: Taskloop */
     #pragma omp parallel num_threads(4)
@@ -376,7 +398,8 @@ int main()
     // // // }
 
     std::cout << "Output: " << sum << std::endl;
-    std::cout << "Runtime: " << get_time_microsecond() - start_time << std::endl;
+    // std::cout << "Runtime: " << get_time_microsecond() - start_time << std::endl;
 
+    // shutdown_spdlog();
     return 0;
 }

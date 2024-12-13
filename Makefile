@@ -7,19 +7,21 @@
 # Compiler and Flags
 CXX := clang++ 
 CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -fPIC 
-# CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -fPIC -lfmt
 
-# OpenMP Flags (Ensure OpenMP and OMPT support)
-OMPFLAGS := -fopenmp
+# OpenMP and Other Flags (Ensure OpenMP and OMPT support)
+FLAGS := -fopenmp -pthread
+# FLAGS := -fopenmp -lspdlog -lfmt -pthread
 
 # Boost Include Path (Update this path based on your Boost installation)
 BOOST_INC := /usr/local/opt/boost/include
 OMPT_INC := /usr/local/opt/libomp/include
+QUILL_INC := /usr/local/opt/quill/include
 # SPDLOG_INC := /usr/local/opt/spdlog/include
 # FMT_INC := /usr/local/opt/fmt/include
 
 BOOST_LIB := /usr/local/opt/boost/lib
 OMPT_LIB := /usr/local/opt/libomp/lib
+QUILL_LIB := /usr/local/opt/quill/lib
 # SPDLOG_LIB := /usr/local/opt/spdlog/lib
 # FMT_LIB := /usr/local/opt/fmt/lib
 
@@ -40,10 +42,8 @@ SAMPLE_SRC := $(SRC_DIR)/sample.cpp
 SAMPLE_BIN := sample
 
 # Include Paths
-INCLUDES := -I$(SRC_DIR) -I$(BOOST_INC) -I$(OMPT_INC)
-LIBRARIES := -L$(BOOST_LIB) -L$(OMPT_LIB)
-# INCLUDES := -I$(SRC_DIR) -I$(BOOST_INC) -I$(OMPT_INC) -I$(SPDLOG_INC) -I$(FMT_INC)
-# LIBRARIES := -L$(BOOST_LIB) -L$(OMPT_LIB) -L$(SPDLOG_LIB) -L$(FMT_LIB)
+INCLUDES := -I$(SRC_DIR) -I$(BOOST_INC) -I$(OMPT_INC) -I$(QUILL_INC)
+LIBRARIES := -L$(BOOST_LIB) -L$(OMPT_LIB) -L$(QUILL_LIB)
 
 # ============================
 # Targets
@@ -64,11 +64,11 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 
 # Link OMPT Tool into Dynamic Library
 $(TOOL_LIB): $(TOOL_OBJ)
-	$(CXX) $(CXXFLAGS) $(OMPFLAGS) $(TOOL_LDFLAGS) $(LIBRARIES) -o $@ $^
+	$(CXX) $(CXXFLAGS) $(FLAGS) $(TOOL_LDFLAGS) $(LIBRARIES) -o $@ $^
 
 # Compile Sample Code
 $(SAMPLE_BIN): $(SAMPLE_SRC)
-	$(CXX) $(CXXFLAGS) $(OMPFLAGS) $(LIBRARIES) -o $@ $<
+	$(CXX) $(CXXFLAGS) $(FLAGS) $(INCLUDES) $(LIBRARIES) -o $@ $<
 
 # Clean Build and Logs
 clean:

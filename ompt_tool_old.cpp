@@ -10,62 +10,6 @@
 #include <utility>
 #include <thread>
 
-// spdlog headers
-#include "spdlog/spdlog.h"
-#include "spdlog/fmt/ostr.h"
-#include "spdlog/async.h"
-#include "spdlog/sinks/basic_file_sink.h"
-// Initialize spdlog
-constexpr size_t async_queue_size = 1048576; // 1 million items
-constexpr size_t async_thread_count = 2;      // Number of worker threads
-
-void initialize_spdlog()
-{
-    spdlog::init_thread_pool(async_queue_size, async_thread_count);
-}
-
-void shutdown_spdlog()
-{
-    spdlog::shutdown();
-}
-
-// Global map and mutex for managing per-thread loggers
-std::unordered_map<uint64_t, std::shared_ptr<spdlog::logger>> thread_loggers;
-std::mutex logger_map_mutex;
-
-// Function to retrieve or create a logger for a given thread
-std::shared_ptr<spdlog::logger> get_thread_logger(uint64_t thread_id)
-{
-    std::lock_guard<std::mutex> lock(logger_map_mutex);
-    auto it = thread_loggers.find(thread_id);
-    if (it != thread_loggers.end())
-    {
-        return it->second;
-    }
-    else
-    {
-        // Ensure logs directory exists
-        std::filesystem::create_directories("logs");
-
-        // Create a new asynchronous logger for the thread
-        std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-        auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(filename, true);
-        file_sink->set_level(spdlog::level::info);
-        // file_sink->set_pattern("[%H:%M:%S %z] [%^%l%$] [thread %t] %v");
-        file_sink->set_pattern("%v");
-
-        auto logger = std::make_shared<spdlog::logger>("logger_thread_" + std::to_string(thread_id), file_sink);
-        logger->set_level(spdlog::level::info);
-        logger->flush_on(spdlog::level::info);
-
-        // Register the logger with spdlog's registry
-        spdlog::register_logger(logger);
-        thread_loggers[thread_id] = logger;
-        return logger;
-    }
-}
-
-
 ompt_function_lookup_t global_lookup = NULL;
 int global_task_number = 0;
 int parallel_id_number = 1;
@@ -85,35 +29,22 @@ void wipe_log(uint64_t thread_id) {
 }
 
 void log_event(uint64_t thread_id, const std::string &event_type, const std::vector<std::pair<std::string, std::string>> &details) {
-    // std::ofstream outFile;
-    // std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    // outFile.open(filename, std::ios::app);
+    std::ofstream outFile;
+    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
+    outFile.open(filename, std::ios::app);
 
-    // std::string log_message;
-    // log_message += "Time: " + std::to_string(get_time_microsecond()) + " µs\n";
-    // log_message += "Event: " + event_type + "\n";
+    std::string log_message;
+    log_message += "Time: " + std::to_string(get_time_microsecond()) + " µs\n";
+    log_message += "Event: " + event_type + "\n";
 
-    // for (const auto &detail : details) {
-    //     log_message += detail.first + ": " + detail.second + "\n";
-    // }
-
-    // log_message += "--------------------------\n";
-
-    // outFile << log_message;
-    // outFile.flush();  // Ensure the write is completed
-    
-    auto logger = get_thread_logger(thread_id);
-
-    // Construct the log message using spdlog's formatting
-    std::string log_message = fmt::format("Time: {} µs\nEvent: {}\n", get_time_microsecond(), event_type);
     for (const auto &detail : details) {
-        log_message += fmt::format("{}: {}\n", detail.first, detail.second);
+        log_message += detail.first + ": " + detail.second + "\n";
     }
+
     log_message += "--------------------------\n";
 
-    // Log asynchronously
-    logger->info("{}", log_message);
-
+    outFile << log_message;
+    outFile.flush();  // Ensure the write is completed
 }
 
 // Callback for parallel region start
@@ -363,8 +294,7 @@ void on_sync_region_wait(ompt_sync_region_t kind,
 // OMPT initialization
 int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_data_t *tool_data)
 {
-    initialize_spdlog();
-
+    std::cout << "OMPT tool initialized.\n";
     global_lookup = lookup;
     auto register_callback = (ompt_set_callback_t)lookup("ompt_set_callback");
 
@@ -399,8 +329,6 @@ int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_
         start_dl_detector_thread();
     }
 
-    std::cout << "OMPT tool initialized.\n";
-
     return 1; // Successful initialization
 }
 
@@ -410,7 +338,7 @@ void ompt_finalize(ompt_data_t *tool_data)
     if (use_dl_detector) {
         end_dl_detector_thread();
     }
-    shutdown_spdlog();
+    
     std::cout << "OMPT tool finalized.\n";
 }
 
