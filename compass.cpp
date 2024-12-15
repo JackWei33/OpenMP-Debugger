@@ -1,3 +1,9 @@
+#include "quill/Backend.h"
+#include "quill/Frontend.h"
+#include "quill/LogMacros.h"
+#include "quill/Logger.h"
+#include "quill/sinks/FileSink.h"
+
 #include "compass.h"
 
 #include <omp.h>
@@ -5,7 +11,6 @@
 #include <vector>
 #include <chrono>
 #include <cstdint>
-#include <mutex>
 
 // Anonymous namespace to restrict visibility to this translation unit
 
@@ -16,20 +21,7 @@ inline long long get_time_microsecond() {
     return micros;
 }
 
-// The logging function
-void log_event(uint64_t thread_id, const std::string &event_type,
-               const std::vector<std::pair<std::string, std::string>> &details) {
-    static std::mutex file_mutex; // To ensure thread-safe file operations
-    std::lock_guard<std::mutex> lock(file_mutex);
-
-    std::ofstream outFile;
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-    if (!outFile.is_open()) {
-        // Handle error (optional)
-        return;
-    }
-
+void log_event(uint64_t thread_id, const std::string &event_type, const std::vector<std::pair<std::string, std::string>> &details) {
     std::string log_message;
     log_message += "Time: " + std::to_string(get_time_microsecond()) + " µs\n";
     log_message += "Event: " + event_type + "\n";
@@ -38,10 +30,30 @@ void log_event(uint64_t thread_id, const std::string &event_type,
         log_message += detail.first + ": " + detail.second + "\n";
     }
 
-    log_message += "--------------------------\n";
+    if (quill::Backend::is_running()) {
+        
+        auto file_sink = quill::Frontend::create_or_get_sink<quill::FileSink>(
+            "logs/logs_thread_" + std::to_string(thread_id) + ".txt",
+            []()
+        {
+            quill::FileSinkConfig cfg;
+            cfg.set_open_mode('a');
+            return cfg;
+        }());
 
-    outFile << log_message;
-    outFile.flush();  // Ensure the write is completed
+        quill::Logger* logger =
+            quill::Frontend::create_or_get_logger("thread_logger_" + std::to_string(thread_id), std::move(file_sink));
+
+        
+        LOG_INFO(logger, "{}", log_message);
+    } else {
+        std::ofstream outFile;
+        std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
+        outFile.open(filename, std::ios::app);
+        log_message += "--------------------------\n";
+        outFile << log_message;
+        outFile.flush();  // Ensure the write is completed
+    }
 }
 
 // Helper function to construct the details vector with mandatory "Name" and optional key-value pairs

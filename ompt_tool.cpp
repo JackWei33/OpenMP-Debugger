@@ -1,3 +1,9 @@
+#include "quill/Backend.h"
+#include "quill/Frontend.h"
+#include "quill/LogMacros.h"
+#include "quill/Logger.h"
+#include "quill/sinks/FileSink.h"
+
 #include <omp-tools.h>
 #include <omp.h>
 #include <iostream>
@@ -21,19 +27,7 @@ long long get_time_microsecond() {
     return micros;
 }
 
-void wipe_log(uint64_t thread_id) {
-    std::ofstream outFile;
-    // std::string filename = pathToFolder + "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::trunc);
-}
-
 void log_event(uint64_t thread_id, const std::string &event_type, const std::vector<std::pair<std::string, std::string>> &details) {
-    std::ofstream outFile;
-    // std::string filename = pathToFolder + "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
-    outFile.open(filename, std::ios::app);
-
     std::string log_message;
     log_message += "Time: " + std::to_string(get_time_microsecond()) + " µs\n";
     log_message += "Event: " + event_type + "\n";
@@ -42,10 +36,30 @@ void log_event(uint64_t thread_id, const std::string &event_type, const std::vec
         log_message += detail.first + ": " + detail.second + "\n";
     }
 
-    log_message += "--------------------------\n";
+    if (quill::Backend::is_running()) {
+        
+        auto file_sink = quill::Frontend::create_or_get_sink<quill::FileSink>(
+            "logs/logs_thread_" + std::to_string(thread_id) + ".txt",
+            []()
+        {
+            quill::FileSinkConfig cfg;
+            cfg.set_open_mode('a');
+            return cfg;
+        }());
 
-    outFile << log_message;
-    outFile.flush();  // Ensure the write is completed
+        quill::Logger* logger =
+            quill::Frontend::create_or_get_logger("thread_logger_" + std::to_string(thread_id), std::move(file_sink));
+
+        
+        LOG_INFO(logger, "{}", log_message);
+    } else {
+        std::ofstream outFile;
+        std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
+        outFile.open(filename, std::ios::app);
+        log_message += "--------------------------\n";
+        outFile << log_message;
+        outFile.flush(); 
+    }
 }
 
 // Callback for parallel region start
@@ -155,7 +169,6 @@ void on_implicit_task(ompt_scope_endpoint_t endpoint, ompt_data_t *parallel_data
         #pragma omp atomic
         global_task_number++;
     }
-    
 
     log_event(thread_id, "Implicit Task", {
         {"Task Number", std::to_string(task_data->value)},
@@ -174,7 +187,7 @@ void on_thread_create(ompt_thread_t thread_type, ompt_data_t *thread_data)
     
     thread_data->value = (uint64_t)omp_get_thread_num();
 
-    wipe_log(omp_thread_num);
+    quill::Backend::start();
 
     log_event(omp_thread_num, "Thread Create", {
         {"Thread Type", ompt_thread_t_to_string(thread_type)}
@@ -295,7 +308,6 @@ void on_sync_region_wait(ompt_sync_region_t kind,
 // OMPT initialization
 int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_data_t *tool_data)
 {
-    std::cout << "OMPT tool initialized.\n";
     global_lookup = lookup;
     auto register_callback = (ompt_set_callback_t)lookup("ompt_set_callback");
 
@@ -330,17 +342,14 @@ int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_
         start_dl_detector_thread();
     }
 
+    std::cout << "OMPT tool initialized.\n";
+
     return 1; // Successful initialization
 }
 
 // OMPT finalization
 void ompt_finalize(ompt_data_t *tool_data)
 {
-    // log_event(omp_get_thread_num(), "OMPT Finalize", {});
-    // print the tool data
-
-    std::cout << "Tool data: " << tool_data->value << std::endl;
-
     if (use_dl_detector) {
         end_dl_detector_thread();
     }
