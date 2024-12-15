@@ -3,7 +3,7 @@
 #include <vector>
 #include <thread> // For std::this_thread::sleep_for
 #include <chrono> // For std::chrono::microseconds
-#include "trace_logging.h"
+#include "compass.h"
 
 void my_func(int& sum, omp_lock_t& lock) {
     // Use lock to update sum
@@ -20,97 +20,111 @@ int fib(int n) {
     #pragma omp task
     j = fib(n - 2);
     #pragma omp taskwait
-    return i + j;
+    compass_trace_begin("Fibs work" + std::to_string(n));
+    int res = i + j;
+    compass_trace_end("Fibs work" + std::to_string(n));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100 / n));
+    return res;
 }
 
 int main()
 {
-    long long start_time = get_time_microsecond();
+    // long long start_time = get_time_microsecond();
     int sum = 0;
 
     std::cout << "Thread: " << omp_get_thread_num() << std::endl;
 
-    // /* Example 1: Tasks spawn from single */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp single
-    //     {
-    //         for (int i = 0; i < 5; ++i) {
-    //             #pragma omp task firstprivate(i)
-    //             {
-    //                 std::cout << "Task " << i << " executed by thread " << omp_get_thread_num() << std::endl;
-    //                 // my_func(sum);
-    //                 sum++;
-    //             }
-    //         }
-    //     }
-    // }
 
-    // /* Example 2: Tasks spawn from parallel */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp task
-    //     {
-    //         int pid = omp_get_thread_num();
-    //         std::cout << "Task 1 executed by thread " << pid << std::endl;
-    //         if (pid == 0) {
-    //             std::this_thread::sleep_for(std::chrono::seconds(1));
-    //         }
-    //         sum++;
-    //     }
 
-    //     #pragma omp task
-    //     {
-    //         int pid = omp_get_thread_num();
-    //         std::cout << "Task 2 executed by thread " << pid << std::endl;
-    //         if (pid == 0) {
-    //             std::this_thread::sleep_for(std::chrono::seconds(1));
-    //         }
-    //         sum++;
-    //     }
-    // }
-
-    // /* Example 3: Tasks spawn from tasks */
-    // #pragma omp parallel num_threads(4)
-    // {
-    //     #pragma omp single
-    //     {
-    //         #pragma omp task
-    //         {
-    //             int pid = omp_get_thread_num();
-    //             std::cout << "Task 1 executed by thread " << pid << std::endl;
-    //             #pragma omp task
-    //             {
-    //                 int pid_inner = omp_get_thread_num();
-    //                 std::cout << "Task 1.1 executed by thread " << pid_inner << std::endl;
-    //                 sum++;
-    //             }
-    //             sum++;
-    //         }
-
-    //         #pragma omp task
-    //         {
-    //             int pid = omp_get_thread_num();
-    //             std::cout << "Task 2 executed by thread " << pid << std::endl;
-    //             #pragma omp task
-    //             {
-    //                 int pid_inner = omp_get_thread_num();
-    //                 std::cout << "Task 2.1 executed by thread " << pid_inner << std::endl;
-    //                 sum++;
-    //             }
-    //             sum++;
-    //         }
-    //     }
-    // }
-
-    // /* Example 4: Parallel for */
     // #pragma omp parallel num_threads(4)
     // {
     //     #pragma omp for
-    //     for (int i = 0; i < 5; i++) {
-    //         sum++;
-    //     }
-    // }
+    //     for (int i = 0; i < 10; i++) {
+    //         compass_trace_begin("Task", i);
+            
+
+
+            /* Example 1: Tasks spawn from single */
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp single
+        {
+            for (int i = 0; i < 5; ++i) {
+                #pragma omp task firstprivate(i)
+                {
+                    std::cout << "Task " << i << " executed by thread " << omp_get_thread_num() << std::endl;
+                    // my_func(sum);
+                    sum++;
+                }
+            }
+        }
+    }
+
+    /* Example 2: Tasks spawn from parallel */
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp task
+        {
+            int pid = omp_get_thread_num();
+            std::cout << "Task 1 executed by thread " << pid << std::endl;
+            if (pid == 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            sum++;
+        }
+
+        #pragma omp task
+        {
+            int pid = omp_get_thread_num();
+            std::cout << "Task 2 executed by thread " << pid << std::endl;
+            if (pid == 0) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            sum++;
+        }
+    }
+
+    /* Example 3: Tasks spawn from tasks */
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp single
+        {
+            #pragma omp task
+            {
+                int pid = omp_get_thread_num();
+                std::cout << "Task 1 executed by thread " << pid << std::endl;
+                #pragma omp task
+                {
+                    int pid_inner = omp_get_thread_num();
+                    std::cout << "Task 1.1 executed by thread " << pid_inner << std::endl;
+                    sum++;
+                }
+                sum++;
+            }
+
+            #pragma omp task
+            {
+                int pid = omp_get_thread_num();
+                std::cout << "Task 2 executed by thread " << pid << std::endl;
+                #pragma omp task
+                {
+                    int pid_inner = omp_get_thread_num();
+                    std::cout << "Task 2.1 executed by thread " << pid_inner << std::endl;
+                    sum++;
+                }
+                sum++;
+            }
+        }
+    }
+
+    /* Example 4: Parallel for */
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp for
+        for (int i = 0; i < 5; i++) {
+            sum++;
+        }
+    }
 
     #pragma omp parallel num_threads(4)
     {
@@ -122,8 +136,53 @@ int main()
         compass_trace_end("Parallel for");
     }
 
+    // // // reduction example
+    // // std::vector<int> vec(100);
+    // // for (int i = 0; i < 100; i++) {
+    // //     vec[i] = i;
+    // // }
+
+    // // #pragma omp parallel for reduction(+:sum) num_threads(4)
+    // // for (int i = 0; i < 100; i++) {
+    // //     sum += vec[i];
+    // // }
+
+
+    // // // for loop with large granularity and critical 
+    // // #pragma omp parallel num_threads(4)
+    // // {
+    // //     #pragma omp for schedule(dynamic, 1000)
+    // //     for (int i = 0; i < 10000; i++) {
+    // //         #pragma omp critical
+    // //         sum += i * i;
+    // //     }
+    // // }
+
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp single
+        fib(3);
+    }
+
+
+    // // // barrier and critical example
+
+    // // #pragma omp parallel num_threads(4)
+    // // {
+    // //     std::vector<int> vec(100000);
+    // //     for (int i = 0; i < 100000; i++) {
+    // //         vec[i] = i;
+    // //     }
+    // //     #pragma omp barrier
+    // //     #pragma omp for
+    // //     for (int i = 0; i < 100000; i++) {
+    // //         #pragma omp critical
+    // //         sum += vec[i];
+    // //     }
+    // // }
+
     /* Example 5: Taskloop */
-    LIBRARY_BEGIN_TRACE("hi");
+    // LIBRARY_BEGIN_TRACE("hi");
     #pragma omp parallel num_threads(4)
     {
         #pragma omp single
@@ -136,16 +195,17 @@ int main()
             }
         }
     }
-    LIBRARY_END_TRACE("hi");
+    // // LIBRARY_END_TRACE("hi");
 
     // // /* Example 6: Barrier and critical */
-    // omp_lock_t lock;
-    // omp_init_lock(&lock);
+    omp_lock_t lock;
+    omp_init_lock(&lock);
 
-    // // #pragma omp parallel num_threads(2)
-    // // {
-    // //     my_func(sum, lock);
-    // // }
+    #pragma omp parallel num_threads(2)
+    {
+        my_func(sum, lock);
+        #pragma omp barrier
+    }
 
     // #pragma omp parallel num_threads(4)
     // {
@@ -378,7 +438,7 @@ int main()
     // // // }
 
     std::cout << "Output: " << sum << std::endl;
-    std::cout << "Runtime: " << get_time_microsecond() - start_time << std::endl;
+    // std::cout << "Runtime: " << get_time_microsecond() - start_time << std::endl;
 
     return 0;
 }

@@ -319,17 +319,19 @@ def create_stacked_bar_chart(parallel_sections_data, sections):
     fig.show()
 
 
-def make_synchronization_bar_chart():
-    log_folder_name = "logs/"
-    thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
-    parallel_sections_data = get_time_spent_by_section(thread_num_to_events)
-    convert_from_micro_to_milli(parallel_sections_data)
+# def make_synchronization_bar_chart():
+#     # log_folder_name = "asst3/code/logs/"
+#     log_folder_name = "logs/"
+#     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
+#     parallel_sections_data = get_time_spent_by_section(thread_num_to_events)
+#     convert_from_micro_to_milli(parallel_sections_data)
 
-    sections = set(['Working', 'Critical', 'Lock', 'Implicit Barrier', 'Barrier', 'Other', 'Task Group', 'Task Wait'])
+#     sections = set(['Working', 'Critical', 'Lock', 'Implicit Barrier', 'Barrier', 'Other', 'Task Group', 'Task Wait'])
 
-    create_stacked_bar_chart(parallel_sections_data, sections)
+#     create_stacked_bar_chart(parallel_sections_data, sections)
 
 def make_task_bar_chart():
+    # log_folder_name = "asst3/code/logs/"
     log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     parallel_sections_data = get_time_spent_by_task(thread_num_to_events)
@@ -344,5 +346,5 @@ def make_task_bar_chart():
     create_stacked_bar_chart(parallel_sections_data, sections)
 
 if __name__ == "__main__":
-    make_synchronization_bar_chart()
+    # make_synchronization_bar_chart()
     make_task_bar_chart()

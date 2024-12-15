@@ -260,7 +260,7 @@ def create_event(event_dict, thread_number: int):
         )
     return LogEvent(time=time, event=event, thread_number=thread_number)
 
-def generate_dag(thread_num_to_events: Dict[int, List[LogEvent]]):
+def generate_dag(thread_num_to_events: Dict[int, List[LogEvent]], detailed: bool = False):
     """
     Generates a DAG from the given thread events, creating temporal and dependency edges.
 
@@ -1080,6 +1080,7 @@ def generate_graph_folder():
 
 def main():
     folder_name = generate_graph_folder()
+    # log_folder_name = "asst3/code/logs/"
     log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     for thread_number, events in thread_num_to_events.items():
@@ -1097,6 +1098,7 @@ def main():
 
 def main_graphviz():
     folder_name = generate_graph_folder()
+    # log_folder_name = "asst3/code/logs/"
     log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     graph_nodes = generate_dag(thread_num_to_events)

@@ -1,2 +1,4 @@
-logs/
 graphs/
+validate.o
+wireroute
+wireroute.o

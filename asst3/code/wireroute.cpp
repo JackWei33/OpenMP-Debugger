@@ -19,7 +19,7 @@
 #include <functional>
 #include <cstdlib>
 #include <climits>
-#include "trace_logging.h"
+#include "../../compass.h"
 
 #include <unistd.h>
 #include <omp.h>
@@ -105,7 +105,7 @@ auto generate_SA_coin(double SA_prob) {
 }
 
 void update_grid_along_wire(Wire& wire, std::vector<std::vector<int>>& occupancy, int delta) {
-    LIBRARY_BEGIN_TRACE("UPDATE_GRID_ALONG_WIRE");
+    // compass_trace_begin("UPDATE_GRID_ALONG_WIRE");
     int pos_x = wire.start_x;
     int pos_y = wire.start_y;
 
@@ -177,7 +177,7 @@ void update_grid_along_wire(Wire& wire, std::vector<std::vector<int>>& occupancy
 
         occupancy[pos_y][pos_x] += delta;
     }
-    LIBRARY_END_TRACE("UPDATE_GRID_ALONG_WIRE");
+    // compass_trace_end("UPDATE_GRID_ALONG_WIRE");
 }
 
 void update_grid_along_wire_v2(Wire& wire, std::vector<std::vector<int>>& occupancy, std::vector<std::vector<int>>& occupancy2, int delta) {
@@ -481,7 +481,7 @@ int get_cost_of_route_v2(Wire& wire, int suggested_x, int suggested_y, std::vect
 }
 
 void set_best_route_v1(Wire& wire, std::vector<std::vector<int>>& occupancy, int squares_table[], bool in_parallel = false) {
-    LIBRARY_BEGIN_TRACE("SET_BEST_ROUTE_V1");
+    // compass_trace_begin("SET_BEST_ROUTE_V1");
     /* Uses parallel loop and dynamic scheduling */
     int delta_x = wire.end_x - wire.start_x;
     int delta_y = wire.end_y - wire.start_y;
@@ -489,8 +489,64 @@ void set_best_route_v1(Wire& wire, std::vector<std::vector<int>>& occupancy, int
     int best_movement = 0;
     int min_cost = INT_MAX;
 
+    // int cells_per_task = 10000;
+    // int num_movements = std::abs(delta_x) + std::abs(delta_y);
+    // int num_routes_per_task = std::ceil(cells_per_task / num_movements);
+    // int num_tasks = (num_movements + num_routes_per_task - 1) / num_routes_per_task;
+
+    //     // Use OpenMP tasks within the existing parallel region
+    // #pragma omp single
+    // {
+    //     for(int t = 0; t < num_tasks; t++) {
+    //         #pragma omp task firstprivate(t)
+    //         {
+    //             for(int j = 0; j < num_routes_per_task; j++) {
+    //                 int i = t * num_routes_per_task + j;
+    //                 int movement = i + 1;
+    //                 if(movement > num_movements) {
+    //                     break;
+    //                 }
+    //                 auto [new_bend1_x, new_bend1_y] = get_bend(wire, movement);
+    //                 int cost = get_cost_of_route(wire, new_bend1_x, new_bend1_y, occupancy, squares_table);
+
+    //                 // Critical section to safely update shared variables
+    //                 #pragma omp critical
+    //                 {
+    //                     if(cost < min_cost){
+    //                         min_cost = cost;
+    //                         best_movement = movement;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     // Task barrier to ensure all tasks are completed before proceeding
+    //     #pragma omp taskwait
+    // }
+
+
+    // #pragma omp parallel for default(shared) schedule(dynamic, 1)
+    // for (int t = 0; t < num_tasks; t++) {
+    //     for (int j = 0; j < num_routes_per_task; j++) {
+    //         int i = t * num_routes_per_task + j;
+    //         int movement = i + 1;
+    //         if (movement > num_movements) {
+    //             break;
+    //         }
+    //         auto [new_bend1_x, new_bend1_y] = get_bend(wire, movement);
+    //         int cost = get_cost_of_route(wire, new_bend1_x, new_bend1_y, occupancy, squares_table);
+
+    //         #pragma omp critical
+    //         if (cost < min_cost) {
+    //             min_cost = cost;
+    //             best_movement = movement;
+    //         }
+    //     }
+    // }
+
+    int num_movements = std::abs(delta_x) + std::abs(delta_y) + 1;
     // #pragma omp parallel for default(shared) schedule(auto) if(in_parallel) 
-    for (int j = 1; j < std::abs(delta_x) + std::abs(delta_y) + 1; j++) {
+    for (int j = 1; j < num_movements; j++) {
         int movement = j;
         auto [new_bend1_x, new_bend1_y] = get_bend(wire, movement);
         int cost = get_cost_of_route(wire, new_bend1_x, new_bend1_y, occupancy, squares_table);
@@ -503,7 +559,7 @@ void set_best_route_v1(Wire& wire, std::vector<std::vector<int>>& occupancy, int
     }
      
     update_bend(wire, best_movement);
-    LIBRARY_END_TRACE("SET_BEST_ROUTE_V1");
+    // compass_trace_end("SET_BEST_ROUTE_V1");
 }
 
 
@@ -702,57 +758,111 @@ void across_wires(std::vector<std::vector<int>>& occupancy, std::vector<Wire>& w
          */
         size_t i = 0;
 
+        // #pragma omp parallel
+        // {
+        //     size_t start, end;
+        //     while (true) {
+        //         omp_set_lock(occupancy_lock);
+        //         start = i;
+        //         i += batch_size;
+        //         end = std::min(i, num_wires);
+        //         omp_unset_lock(occupancy_lock);
+        //         if (start >= num_wires) {
+        //             break;
+        //         }
+
+        //         if (k == 0) {
+        //             for (size_t j = start; j < end; j++) {
+        //                 set_random_route(wires[j]);
+        //             }
+
+        //             omp_set_lock(writers_lock);
+        //             for (size_t j = start; j < end; j++) {
+        //                 add_wire_to_grid(wires[j], occupancy);
+        //             }
+        //             omp_unset_lock(writers_lock);
+        //         } else {
+        //             omp_set_lock(writers_lock);
+        //             for (size_t j = start; j < end; j++) {
+        //                 remove_wire_from_grid(wires[j], occupancy);
+        //             }
+        //             omp_unset_lock(writers_lock);
+                    
+        //             for (size_t j = start; j < end; j++) {
+        //                 if (choose_min()) {
+        //                     set_best_route_v1(wires[j], occupancy, squares_table);
+        //                 } else {
+        //                     set_random_route(wires[j]);
+        //                 }
+        //             }
+
+        //             omp_set_lock(writers_lock);
+        //             for (size_t j = start; j < end; j++) {
+        //                 add_wire_to_grid(wires[j], occupancy);
+        //             }
+        //             omp_unset_lock(writers_lock);
+        //         }
+        //     }
+        // }
         #pragma omp parallel
         {
-            size_t start, end;
-            while (true) {
-                omp_set_lock(occupancy_lock);
-                start = i;
-                i += batch_size;
-                end = std::min(i, num_wires);
-                omp_unset_lock(occupancy_lock);
-                if (start >= num_wires) {
-                    break;
-                }
+            #pragma omp single
+            {
+                for (size_t k = 0; k < static_cast<size_t>(SA_iters); k++) {
+                    for (size_t j = 0; j < num_wires; j += batch_size) {
+                        size_t start = j;
+                        size_t end = std::min(j + batch_size, num_wires);
+                        
+                        #pragma omp task firstprivate(start, end, k)
+                        {
+                            if (k == 0) {
+                                // Initial iteration: Assign random routes
+                                for (size_t m = start; m < end; m++) {
+                                    set_random_route(wires[m]);
+                                }
 
-                if (k == 0) {
-                    for (size_t j = start; j < end; j++) {
-                        set_random_route(wires[j]);
-                    }
+                                // Add wires to the grid within a critical section
+                                #pragma omp critical
+                                {
+                                    for (size_t m = start; m < end; m++) {
+                                        add_wire_to_grid(wires[m], occupancy);
+                                    }
+                                }
+                            } else {
+                                // Subsequent iterations: Optimize routes
+                                
+                                // Remove wires from the grid within a critical section
+                                #pragma omp critical
+                                {
+                                    for (size_t m = start; m < end; m++) {
+                                        remove_wire_from_grid(wires[m], occupancy);
+                                    }
+                                }
 
-                    omp_set_lock(writers_lock);
-                    for (size_t j = start; j < end; j++) {
-                        add_wire_to_grid(wires[j], occupancy);
-                    }
-                    omp_unset_lock(writers_lock);
-                } else {
-                    omp_set_lock(writers_lock);
-                    for (size_t j = start; j < end; j++) {
-                        remove_wire_from_grid(wires[j], occupancy);
-                    }
-                    omp_unset_lock(writers_lock);
-                    
-                    for (size_t j = start; j < end; j++) {
-                        if (choose_min()) {
-                            set_best_route_v1(wires[j], occupancy, squares_table);
-                        } else {
-                            set_random_route(wires[j]);
+                                // Perform simulated annealing or random assignment
+                                for (size_t m = start; m < end; m++) {
+                                    if (choose_min()) {
+                                        set_best_route_v1(wires[m], occupancy, squares_table);
+                                    } else {
+                                        set_random_route(wires[m]);
+                                    }
+                                }
+
+                                // Add optimized wires back to the grid within a critical section
+                                #pragma omp critical
+                                {
+                                    for (size_t m = start; m < end; m++) {
+                                        add_wire_to_grid(wires[m], occupancy);
+                                    }
+                                }
+                            }
                         }
                     }
-
-                    omp_set_lock(writers_lock);
-                    for (size_t j = start; j < end; j++) {
-                        add_wire_to_grid(wires[j], occupancy);
-                    }
-                    omp_unset_lock(writers_lock);
+                    // Ensure all tasks for the current iteration are completed before moving to the next
+                    #pragma omp taskwait
                 }
             }
         }
-    }
-    int sum = 0;
-    #pragma omp parallel
-    {
-        sum++;
     }
 
     omp_destroy_lock(writers_lock);
