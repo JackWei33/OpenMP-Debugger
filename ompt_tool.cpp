@@ -8,25 +8,11 @@
 #include <vector>
 #include <string>
 #include <utility>
-// #include <thread>
-// #include <filesystem>
 
 ompt_function_lookup_t global_lookup = NULL;
 int global_task_number = 0;
 int parallel_id_number = 1;
 bool use_dl_detector = false; 
-
-// std::string extract_until(const std::string& path, const std::string& target) {
-//     size_t pos = path.find(target); // Find the target in the string
-//     if (pos == std::string::npos) {
-//         throw std::runtime_error("Target not found in path");
-//     }
-//     size_t lastSlash = path.rfind('/', pos - 1); // Find the last '/' before the target
-//     return path.substr(0, lastSlash + 1);       // Extract up to that '/'
-// }
-
-// std::filesystem::path currentPath = std::filesystem::current_path();
-// std::string pathToFolder = extract_until(currentPath.string(), "OpenMP-Debugger") + "OpenMP-Debugger/";
 
 long long get_time_microsecond() {
     auto now = std::chrono::system_clock::now();
@@ -350,6 +336,11 @@ int ompt_initialize(ompt_function_lookup_t lookup, int initial_device_num, ompt_
 // OMPT finalization
 void ompt_finalize(ompt_data_t *tool_data)
 {
+    // log_event(omp_get_thread_num(), "OMPT Finalize", {});
+    // print the tool data
+
+    std::cout << "Tool data: " << tool_data->value << std::endl;
+
     if (use_dl_detector) {
         end_dl_detector_thread();
     }
