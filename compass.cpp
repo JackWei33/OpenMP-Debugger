@@ -30,6 +30,8 @@ void log_event(uint64_t thread_id, const std::string &event_type, const std::vec
         log_message += detail.first + ": " + detail.second + "\n";
     }
 
+    log_message += "--------------------------\n";
+
     if (quill::Backend::is_running()) {
         
         auto file_sink = quill::Frontend::create_or_get_sink<quill::FileSink>(
@@ -44,13 +46,11 @@ void log_event(uint64_t thread_id, const std::string &event_type, const std::vec
         quill::Logger* logger =
             quill::Frontend::create_or_get_logger("thread_logger_" + std::to_string(thread_id), std::move(file_sink));
 
-        
         LOG_INFO(logger, "{}", log_message);
     } else {
         std::ofstream outFile;
         std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
         outFile.open(filename, std::ios::app);
-        log_message += "--------------------------\n";
         outFile << log_message;
         outFile.flush();  // Ensure the write is completed
     }

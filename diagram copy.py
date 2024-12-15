@@ -151,6 +151,11 @@ def parse_log(lines: str, thread_number: int):
     current_event = {}
     for line in lines.strip().split("\n"):
         line = line.strip()
+        if 'thread_logger' in line:
+            """ line looks like ... thread_logger_x [line of interest] """
+            line = line.split("thread_logger_")[1].strip() # this doesn't account for x > 9, we want to throw away the x part
+            line = line[line.find(" ") + 1:]
+            
         if not line or line.startswith("--------------------------"):
             if current_event:
                 
@@ -162,7 +167,6 @@ def parse_log(lines: str, thread_number: int):
         key, value = map(str.strip, line.split(": ", 1))
         current_event[key.replace(" ", "_").lower()] = value
     return events
-
 # Slightly modified
 def create_event(event_dict, thread_number: int):
     """ Create an event object from a dictionary extracted from a log file. """
@@ -785,8 +789,8 @@ def generate_graphviz_legend(output_file: str):
 
 def main_graphviz():
     folder_name = generate_graph_folder()
-    log_folder_name = "asst3/code/logs/"
-    # log_folder_name = "logs/"
+    # log_folder_name = "asst3/code/logs/"
+    log_folder_name = "logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     graph_nodes = generate_dag(thread_num_to_events)
     create_graphviz_graph(graph_nodes, f"graphs/{folder_name}/dag", style='thread_groups')

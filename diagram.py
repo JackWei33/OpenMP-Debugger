@@ -151,6 +151,11 @@ def parse_log(lines: str, thread_number: int):
     current_event = {}
     for line in lines.strip().split("\n"):
         line = line.strip()
+        if 'thread_logger' in line:
+            """ line looks like ... thread_logger_x [line of interest] """
+            line = line.split("thread_logger_")[1].strip() # this doesn't account for x > 9, we want to throw away the x part
+            line = line[line.find(" ") + 1:]
+            
         if not line or line.startswith("--------------------------"):
             if current_event:
                 
