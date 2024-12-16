@@ -343,7 +343,8 @@ def generate_dag(thread_num_to_events: Dict[int, List[LogEvent]], detailed: bool
             # if isinstance(event, SyncRegionEvent) or isinstance(event, SyncRegionWaitEvent):
             #     # skip sync region events and sync region wait events
             #     continuefgreen
-            if isinstance(event, WorkEvent) and event.work_type == 'ompt_work_single_other':
+            if isinstance(event, WorkEvent):
+            # if isinstance(event, WorkEvent) and event.work_type == 'ompt_work_single_other':
                 continue
             if isinstance(event, SyncRegionEvent):
                 continue
@@ -789,13 +790,11 @@ def generate_graphviz_legend(output_file: str):
 
 def main_graphviz():
     folder_name = generate_graph_folder()
-    # log_folder_name = "asst3/code/logs/"
-    log_folder_name = "logs/"
+    log_folder_name = "../logs/"
     thread_num_to_events = parse_logs_for_thread_events(log_folder_name)
     graph_nodes = generate_dag(thread_num_to_events)
     create_graphviz_graph(graph_nodes, f"graphs/{folder_name}/dag", style='thread_groups')
     create_graphviz_graph(graph_nodes, f"graphs/{folder_name}/dag_no_thread_groups", style='no_thread_groups')
-    # create_graphviz_graph_by_time(graph_nodes, f"graphs/{folder_name}/dag_by_time")
     generate_graphviz_legend(f"graphs/{folder_name}/legend")
     print(f"Graph saved to graphs/{folder_name}/dag.png")
 

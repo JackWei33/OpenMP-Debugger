@@ -27,7 +27,15 @@ long long get_time_microsecond() {
     return micros;
 }
 
+long long get_time_nanosecond() {
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+    return nanos;
+}
+
 void log_event(uint64_t thread_id, const std::string &event_type, const std::vector<std::pair<std::string, std::string>> &details) {
+    long long logging_start_time = get_time_nanosecond();
     std::string log_message;
     log_message += "Time: " + std::to_string(get_time_microsecond()) + " µs\n";
     log_message += "Event: " + event_type + "\n";
@@ -51,13 +59,15 @@ void log_event(uint64_t thread_id, const std::string &event_type, const std::vec
 
         quill::Logger* logger =
             quill::Frontend::create_or_get_logger("thread_logger_" + std::to_string(thread_id), std::move(file_sink));
-        
+       
         LOG_INFO(logger, "{}", log_message);
+        LOG_INFO(logger, "LOGGING TIME: {} ns", get_time_nanosecond() - logging_start_time);
     } else {
         std::ofstream outFile;
         std::string filename = "logs/logs_thread_" + std::to_string(thread_id) + ".txt";
         outFile.open(filename, std::ios::app);
         outFile << log_message;
+        outFile << "LOGGING TIME: " << get_time_nanosecond() - logging_start_time << " ns\n";
         outFile.flush(); 
     }
 }

@@ -20,28 +20,38 @@ int fib(int n) {
     #pragma omp task
     j = fib(n - 2);
     #pragma omp taskwait
-    compass_trace_begin("Fibs work" + std::to_string(n));
+    // compass_trace_begin("Fibs work" + std::to_string(n));
     int res = i + j;
-    compass_trace_end("Fibs work" + std::to_string(n));
+    // compass_trace_end("Fibs work" + std::to_string(n));
     std::this_thread::sleep_for(std::chrono::milliseconds(100 / n));
     return res;
 }
 
-int fib_with_lock(int n, omp_lock_t& lock) {
-    if (n % 2 == 1 && n != 5) {
-        omp_set_lock(&lock);
-        // do work
-        omp_unset_lock(&lock);
-    }
+int fib_with_lock(int n, omp_lock_t& lock, std::unordered_map<int, int>& cache) {
+    // if (n % 2 == 1 && n != 5) {
+    //     omp_set_lock(&lock);
+    //     // do work
+    //     omp_unset_lock(&lock);
+    // }
     int i, j;
+    omp_set_lock(&lock);
+    if (cache.find(n) != cache.end()) {
+        int x = cache[n];
+        omp_unset_lock(&lock);
+        return x;
+    }
+    omp_unset_lock(&lock);
     if (n < 2) return n;
     #pragma omp task
-    i = fib_with_lock(n - 1, lock);
+    i = fib_with_lock(n - 1, lock, cache);
     #pragma omp task
-    j = fib_with_lock(n - 2, lock);
+    j = fib_with_lock(n - 2, lock, cache);
     #pragma omp taskwait
     // compass_trace_begin("Fibs work" + std::to_string(n));
     int res = i + j;
+    omp_set_lock(&lock);
+    cache[n] = res;
+    omp_unset_lock(&lock);
     // compass_trace_end("Fibs work" + std::to_string(n));
     std::this_thread::sleep_for(std::chrono::milliseconds(100 / n));
     return res;
@@ -54,15 +64,20 @@ int main()
 
     std::cout << "Thread: " << omp_get_thread_num() << std::endl;
 
-    omp_lock_t lock;
-    omp_init_lock(&lock);
+    // omp_lock_t lock;
+    // omp_init_lock(&lock);
+
     // std::unordered_map<int, int> cache;
 
-    #pragma omp parallel num_threads(8)
-    {
-        #pragma omp single
-        fib_with_lock(4, lock);
-    }
+    // #pragma omp parallel num_threads(8)
+    // {
+    //     // #pragma omp single
+    //     // fib_with_lock(100, lock, cache);
+    //     #pragma omp for
+    //     for (int i = 0; i < 100; i++) {
+    //         fib_with_lock(i, lock, cache);
+    //     }
+    // }
 
 
 //     // #pragma omp parallel num_threads(4)
@@ -159,7 +174,7 @@ int main()
 //     {
 //         compass_trace_begin("Parallel for");
 //         #pragma omp for
-//         for (int i = 0; i < 5; i++) {
+//         for (int i = 0; i < 5; i++) {e
 //             // Your work here
 //         }
 //         compass_trace_end("Parallel for");
@@ -177,15 +192,46 @@ int main()
 //     // // }
 
 
-//     // // // for loop with large granularity and critical 
-//     // // #pragma omp parallel num_threads(4)
-//     // // {
-//     // //     #pragma omp for schedule(dynamic, 1000)
-//     // //     for (int i = 0; i < 10000; i++) {
-//     // //         #pragma omp critical
-//     // //         sum += i * i;
-//     // //     }
-//     // // }
+    // // for loop with large granularity and critical 
+    // #pragma omp parallel num_threads(4)
+    // {
+    //     #pragma omp for
+    //     for (int i = 0; i < 4; i++) {
+    //         sum++;
+    //     }
+    // }
+
+    // 3. Parallel Region with Synchronization
+    omp_lock_t lock;
+    omp_init_lock(&lock);
+    // 2. Parallel Region Using Taskloop
+    #pragma omp parallel num_threads(4)
+    {
+        #pragma omp single
+        {
+            #pragma omp taskloop num_tasks(4)
+            for (int i = 0; i < 3; ++i) {
+                std::cout << "Task " << i << " executed by thread " 
+                          << omp_get_thread_num() << std::endl;
+                omp_set_lock(&lock);
+                sum++;
+                omp_unset_lock(&lock);
+            }
+        }
+    }
+
+    
+    #pragma omp parallel num_threads(3)
+    {
+        #pragma omp for
+        for (int i = 0; i < 3; i++) {
+            omp_set_lock(&lock);
+            sum++;
+            omp_unset_lock(&lock);
+        }
+        #pragma omp barrier
+    }
+    omp_destroy_lock(&lock);
 
 //     #pragma omp parallel num_threads(8)
 //     {
@@ -199,21 +245,21 @@ int main()
 //     }
 
 
-//     // // // barrier and critical example
+    // barrier and critical example
 
-//     // // #pragma omp parallel num_threads(4)
-//     // // {
-//     // //     std::vector<int> vec(100000);
-//     // //     for (int i = 0; i < 100000; i++) {
-//     // //         vec[i] = i;
-//     // //     }
-//     // //     #pragma omp barrier
-//     // //     #pragma omp for
-//     // //     for (int i = 0; i < 100000; i++) {
-//     // //         #pragma omp critical
-//     // //         sum += vec[i];
-//     // //     }
-//     // // }
+    // #pragma omp parallel num_threads(4)
+    // {
+    //     std::vector<int> vec(100000);
+    //     for (int i = 0; i < 100000; i++) {
+    //         vec[i] = i;
+    //     }
+    //     #pragma omp barrier
+    //     #pragma omp for
+    //     for (int i = 0; i < 100000; i++) {
+    //         #pragma omp critical
+    //         sum += vec[i];
+    //     }
+    // }
 
 //     /* Example 5: Taskloop */
 //     // LIBRARY_BEGIN_TRACE("hi");
