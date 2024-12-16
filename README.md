@@ -118,6 +118,10 @@ Our current work is to use these logs to output three graphs.
     
 These graphs are in progress and we expect to finish implementing them within the next two to three days. In relation to our goals and deliverables, we are only slightly behind schedule. The three graphs described above are roughly the deliverables we intended to have completed by the midway report. The delay in schedule is largely due to OMPT being more difficult to understand than we initially anticipated. We still believe we will be able to hit all our deliverables and implement the two remaining features of race condition and deadlock detection. The “nice to haves” of the project proposal were a debugger like gdb, a memory leak detector, and a performance optimization suggestor. These seem largely out of reach as we will likely only have time to complete our initial deliverables and goals.
 
+## Reports:
+[Project Proposal](./Project_Proposal.pdf)
+[Midway Report](./Midway_Report.pdf)
+[Final Report](./Final_Report.pdf)
 
 
 ## Schedule
