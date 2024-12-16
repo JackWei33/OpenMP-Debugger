@@ -23,6 +23,85 @@ This helped me use the right clang version:
 
 `export PATH=/Library/Developer/CommandLineTools/usr/bin:$PATH`
 
+
+## Summary
+We are developing a powerful debugging tool for C++ code using OpenMP. This tool will help developers identify bottlenecks, optimize performance, and ensure correctness by detecting potential race conditions and synchronization issues.
+
+---
+
+## Background
+### Planned Features:
+1. **Post-execution Analysis on Thread Workload Distribution**:
+   - Graph workload distribution across threads.
+   - Provide statistics for idle, busy, or waiting threads.
+   - Leverages OMPT for data collection and callback injection.
+
+2. **Post-execution Analysis on Intrathread Workloads**:
+   - Analyze thread performance within individual threads.
+   - Provide data on memory operations vs. arithmetic operations.
+   - Display function-level timing to identify bottlenecks.
+
+3. **Race Condition Checks**:
+   - Detect race conditions at runtime using tools like Intel PIN or OMPT.
+   - Explore static race condition detection by studying existing algorithms.
+
+4. **Deadlock Detection**:
+   - Identify circular dependencies using lock acquisition/release patterns.
+   - Notify users of offending threads and locks causing deadlocks.
+
+5. **Additional Possible Features**:
+   - Debugger with breakpoint control (similar to gdb).
+   - Memory leak detection.
+   - Automatic performance optimization suggestions.
+
+---
+
+## The Challenge
+Developing this tool poses unique challenges:
+- Creating a lightweight debugger with minimal execution overhead.
+- Ensuring ease of use with minimal setup.
+- Collecting and analyzing data effectively using OMPT and other tools.
+- Tackling advanced debugging algorithms for detecting race conditions and deadlocks.
+
+---
+
+## Resources
+- **OMPT (OpenMP Tools API)**: Primary resource for tracking runtime activities.
+- **OMPD**: Plugin for execution control, may provide supplementary insights.
+- **Existing Debugging Tools**:
+  - TotalView
+  - DDT
+
+---
+
+## Goals and Deliverables
+### Plan to Achieve:
+1. Post-execution analysis of thread workload distribution.
+2. Post-execution analysis of intrathread workloads.
+3. Race condition detection (runtime and static).
+4. Deadlock detection.
+5. Stretch Goals:
+   - Breakpoint control.
+   - Memory leak detection.
+   - Performance optimization suggestions.
+
+### Demo:
+- Showcase debugging capabilities on a Parallel VLSI Wire Routing project.
+- Use example programs to demonstrate correctness in detecting race conditions and deadlocks.
+
+### System Capabilities:
+- Identify performance bottlenecks in C++ OpenMP code.
+- Detect race conditions and deadlocks.
+- Lightweight design with minimal user setup.
+
+---
+
+## Platform Choice
+- **Language**: C++ with OpenMP.
+- **Test Environment**: Multi-core processors on Gates Machines.
+
+---
+
 ## Progress (Dec 2)
 
 We have done extensive work and experimenting with OMPT — OpenMP’s own API for tool construction.
@@ -37,15 +116,28 @@ Our current work is to use these logs to output three graphs.
     
 These graphs are in progress and we expect to finish implementing them within the next two to three days. In relation to our goals and deliverables, we are only slightly behind schedule. The three graphs described above are roughly the deliverables we intended to have completed by the midway report. The delay in schedule is largely due to OMPT being more difficult to understand than we initially anticipated. We still believe we will be able to hit all our deliverables and implement the two remaining features of race condition and deadlock detection. The “nice to haves” of the project proposal were a debugger like gdb, a memory leak detector, and a performance optimization suggestor. These seem largely out of reach as we will likely only have time to complete our initial deliverables and goals.
 
+
+
 ## Schedule
-1. December 3 - December 6
-• Luca: Complete algorithm for parsing logs to extract necessary information for the 3 graphs
-• Jack: Build UI for graphs using Plotly
-2. December 6 - December 9
-• Luca: Research and implement race condition detection
-• Jack: Research and implement deadlock detection
-3. December 9 - December 12
-• Luca: Design and build our poster
-• Jack: Use our debugger on example programs and our Assignment 3
-4. December 12 - December 15
-• Jack and Luca: Finish up any remaining work and write the final report
+### November 13 - November 19:
+- Set up development environment and research OMPT.
+- Draft architecture and feature outline.
+
+### November 20 - November 26:
+- Begin basic OMPT integration.
+- Collect basic thread and task scheduling data.
+- Implement data logging and verification.
+
+### November 27 - December 3:
+- Provide post-execution analysis for workload distribution and synchronization primitives.
+- Provide post-execution analysis on task-based workloads.
+
+### December 4 - December 10:
+- Develop deadlock detection using dependency graphs.
+- Build parallel task graph of nodes and edges for implicit and explicit tasks
+- Transition to asynchronous logging
+
+### December 11 - December 15:
+- Design user-friendly output/UI for debugging.
+- Integrate visualizations
+- Design poster
