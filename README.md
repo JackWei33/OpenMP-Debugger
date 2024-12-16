@@ -25,7 +25,8 @@ This helped me use the right clang version:
 
 
 ## Summary
-We are developing a powerful debugging tool for C++ code using OpenMP. This tool will help developers identify bottlenecks, optimize performance, and ensure correctness by detecting potential race conditions and synchronization issues.
+We are developing a powerful debugging tool for C++ code using OpenMP. This tool will help developers visualize task-based workloads, optimize performance, and ensure correctness by detecting potential deadlocks.
+Extended descriptions for all the following sections can be found in the project proposal, midway report and final report.
 
 ---
 
@@ -41,7 +42,7 @@ We are developing a powerful debugging tool for C++ code using OpenMP. This tool
    - Provide data on memory operations vs. arithmetic operations.
    - Display function-level timing to identify bottlenecks.
 
-3. **Race Condition Checks**:
+3. **Race Condition Checks**: (NOT IMPLEMENTED - REPLACED WITH THE PARALLEL EXECUTION GRAPH)
    - Detect race conditions at runtime using tools like Intel PIN or OMPT.
    - Explore static race condition detection by studying existing algorithms.
 
@@ -69,8 +70,9 @@ Developing this tool poses unique challenges:
 - **OMPT (OpenMP Tools API)**: Primary resource for tracking runtime activities.
 - **OMPD**: Plugin for execution control, may provide supplementary insights.
 - **Existing Debugging Tools**:
-  - TotalView
-  - DDT
+  - Otter
+  - Intel VTune
+  - Perf
 
 ---
 
