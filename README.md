@@ -1,5 +1,7 @@
 ## Important commands:
 
+If you don't want to use our handy Makefile, you can use the following commands to compile the tool and sample code:
+
 Command to compile the tool:
 
 `clang++ -fPIC -shared -o libompt_tool.dylib ompt_tool.cpp helper.cpp -I. -I/usr/local/opt/libomp/include -L/usr/local/opt/libomp/lib -fopenmp`

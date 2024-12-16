@@ -22,14 +22,14 @@ QUILL_LIB := /usr/local/opt/quill/lib
 
 # Directories
 SAMPLE_SRC_DIR := .
-TOOL_SRC_DIR := compass/ompt_tool
+TOOL_SRC_DIR := ompt_tool
 BUILD_DIR := build
 LOG_DIR := logs
 
 # OMPT Tool
 TOOL_SRC := $(TOOL_SRC_DIR)/ompt_tool.cpp $(TOOL_SRC_DIR)/helper.cpp $(TOOL_SRC_DIR)/dl_detector.cpp
 TOOL_OBJ := $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(notdir $(TOOL_SRC)))
-TOOL_LIB := libompt_tool.dylib
+TOOL_LIB := build/libompt_tool.dylib
 TOOL_LDFLAGS := -shared
 
 # Sample Code
